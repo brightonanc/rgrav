@@ -1,6 +1,6 @@
 # utilities to load video data from SUMMET:
 # https://www.cs.colostate.edu/~vision/summet/
-# can also use highway dataset from: 
+# can also use change detection dataset from:
 # http://jacarini.dinf.usherbrooke.ca/dataset2012
 
 # Alex also has on his OneDrive:
@@ -15,11 +15,11 @@ import cv2
 this_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-class Highway_Loader():
-    def __init__(self):
-        highway_dir = os.path.join(this_dir, 'highway')
-        self.data_dir = os.path.join(highway_dir, 'input')
-        self.gt_dir = os.path.join(highway_dir, 'groundtruth')
+class Loader_CDW():
+    def __init__(self, base_dir):
+        base_dir = os.path.join(this_dir, base_dir)
+        self.data_dir = os.path.join(base_dir, 'input')
+        self.gt_dir = os.path.join(base_dir, 'groundtruth')
         assert os.path.exists(self.data_dir) and os.path.exists(self.gt_dir), \
             'highway dataset not found'
 
@@ -51,7 +51,7 @@ class SUMMET_Loader():
 
 
 if __name__ == '__main__':
-    loader = Highway_Loader()
+    loader = Loader_CDW('highway')
     print('n_samples: ', loader.n_samples)
     print('data: ', loader.fnames[:3])
     print('ground truth: ', loader.fnames_gt[:3])
