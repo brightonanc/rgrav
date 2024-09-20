@@ -30,7 +30,7 @@ def main():
     P_avg = (U_arr @ U_arr.mT).mean(0)
     U_the = torch.linalg.eigh(P_avg).eigenvectors[:, -K:]
 
-    comm_W = HypercubeGraph.get_optimal_lapl_based_comm_W(hc_dim)
+    comm_W = HypercubeGraph.get_positive_optimal_lapl_based_comm_W(hc_dim)
     cons_rounds = 8
 
     # ============================== Centralized ==============================
