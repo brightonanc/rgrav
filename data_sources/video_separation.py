@@ -10,6 +10,7 @@ import os
 import glob
 import numpy as np
 import cv2
+import h5py
 
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
@@ -43,10 +44,17 @@ class Loader_CDW():
 
 class SUMMET_Loader():
     def __init__(self):
-        self.data_dir = os.path.join(this_dir, 'summet')
-        assert os.path.exists(self.data_dir), 'summet dataset not found'
+        mat_loc = os.path.join(this_dir, 'Summet_Data/DARPA_tracklets_2345_09_05.mat')
+        assert os.path.exists(mat_loc), 'summet dataset not found'
+        with h5py.File(mat_loc, 'r') as f:
+            print(f.keys())
+            print(f['#refs#'])
+            refs = list(f['#refs#'])
+            tracklets = list(f['tracklets'])
+            tracklets = [np.array(t) for t in tracklets]
+            raise NotImplementedError
 
-    def load_data(self):
+    def load_data(self, frame_idx):
         pass
 
 
