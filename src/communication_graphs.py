@@ -112,6 +112,37 @@ class HypercubeGraph:
                     edges.append((i, i | bitmask))
         return tuple(edges)
     @classmethod
+    def get_lapl_based_comm_W(cls, hc_dim, r, dtype=None, dev=None):
+        """
+        Returns a laplacian-based communication matrix W
+
+        Parameters
+        ----------
+        hc_dim : int
+            The dimension in which this hypercube exists. The number of
+            vertices will be 2**hc_dim.
+
+        Returns
+        -------
+        W : tensor[2**hc_dim, 2**hc_dim]
+            A laplacian-based communication matrix W defined as follows
+                I - ((1/(r*d_max)) * L)
+            where d_max is the maximal degree of the graph and L is the graph
+            laplacian
+        """
+        A = adjacency_matrix_from_edges(
+            cls._get_edges(hc_dim),
+            dtype=dtype,
+            dev=dev,
+        )
+        d = A.sum(-1)
+        d_max = d.max()
+        D = d.diag_embed()
+        L = D - A
+        I = torch.eye(A.shape[-1], dtype=dtype, device=dev)
+        W = I - ((1/(r*d_max)) * L)
+        return W
+    @classmethod
     def get_optimal_lapl_based_comm_W(cls, hc_dim, dtype=None, dev=None):
         """
         Returns the optimal laplacian-based communication matrix W
@@ -131,17 +162,31 @@ class HypercubeGraph:
                 * The operator norm of W - (1 1^T / M)
                 * The Frobenius norm of W - (1 1^T / M)
         """
-        A = adjacency_matrix_from_edges(
-            cls._get_edges(hc_dim),
-            dtype=dtype,
-            dev=dev,
-        )
         r = (hc_dim+1) / hc_dim
-        d = A.sum(-1)
-        d_max = d.max()
-        D = d.diag_embed()
-        L = D - A
-        I = torch.eye(A.shape[-1], dtype=dtype, device=dev)
-        W = I - ((1/(r*d_max)) * L)
-        return W
+        return cls.get_lapl_based_comm_W(hc_dim, r=r, dtype=dtype, dev=dev)
+    @classmethod
+    def get_positive_optimal_lapl_based_comm_W(cls, hc_dim, dtype=None, dev=None):
+        """
+        Returns the optimal (with positive eigenvalues only) laplacian-based
+        communication matrix W
+
+        Parameters
+        ----------
+        hc_dim : int
+            The dimension in which this hypercube exists. The number of
+            vertices will be 2**hc_dim.
+
+        Returns
+        -------
+        W : tensor[2**hc_dim, 2**hc_dim]
+            The optimal (with positive eigenvalues only) laplacian-based
+            communication matrix W. W is such that W 1 = 1 and both of the
+            following two quantities are minimized over all choice of
+            laplacian-based communication matrices with strictly non-negative
+            eigenvalues:
+                * The operator norm of W - (1 1^T / M)
+                * The Frobenius norm of W - (1 1^T / M)
+        """
+        r = 2.
+        return cls.get_lapl_based_comm_W(hc_dim, r=r, dtype=dtype, dev=dev)
 
