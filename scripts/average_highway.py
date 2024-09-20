@@ -22,7 +22,7 @@ if __name__ == '__main__':
     print('data flattened: ', X.shape)
 
     X_batches = np.split(X, 100, axis=1)
-    X_batches = X_batches[:10]
+    # X_batches = X_batches[:10]
     print(X_batches[0].shape)
 
     U_arr = []
@@ -31,6 +31,16 @@ if __name__ == '__main__':
         U, S, Vt = np.linalg.svd(X_batch, full_matrices=False)
         U_arr.append(U)
 
+    # visualize first few Us
+    plt.figure()
+    plt.suptitle('First 3 Components of First 3 Us')
+    for m in range(3):
+        for d in range(3):
+            im = U_arr[m][:, d].reshape(im_shape)
+            im = (im - im.min()) / (im.max() - im.min())
+            plt.subplot(331 + m * 3 + d)
+            plt.imshow(im)
+
     U_arr = torch.tensor(U_arr)
 
     rgrav = RGrAv()
@@ -38,12 +48,16 @@ if __name__ == '__main__':
     for iter_frame in tqdm(rgrav.algo_iters(U_arr)):
         U_est = iter_frame.U
         U_iters.append(U_est)
-        if len(U_iters) > 30:
+        if len(U_iters) > 50:
             break
 
     U_dists = [grassmannian_dist(U_iters[i], U_iters[i+1]) for i in range(len(U_iters)-1)]
+    U_dists0 = [grassmannian_dist(U_iters[0], U_iters[i]) for i in range(len(U_iters))]
     plt.figure()
+    plt.subplot(121)
     plt.plot(U_dists)
+    plt.subplot(122)
+    plt.plot(U_dists0)
 
     final_U = U_iters[-1]
     for d in range(3):
