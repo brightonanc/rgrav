@@ -34,7 +34,7 @@ def main():
     plt.show()
     U_the = eigvecs[:, -K:]
 
-    comm_W = HypercubeGraph.get_optimal_lapl_based_comm_W(hc_dim)
+    comm_W = HypercubeGraph.get_positive_optimal_lapl_based_comm_W(hc_dim)
     cons_rounds = 3
     #print(torch.linalg.eigvalsh(comm_W))
     #exit()
