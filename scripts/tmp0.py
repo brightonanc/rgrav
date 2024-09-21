@@ -16,9 +16,9 @@ def main():
     np.random.seed(seed)
     hc_dim = 5
     M = 2**hc_dim
-    N = 43
+    N = 90
     K = 12
-    radius_ratio = 0.9
+    radius_ratio = 0.5
 
     U_arr = util.get_random_clustered_grassmannian_points(
         N=N,
@@ -28,7 +28,9 @@ def main():
     )
     P_avg = (U_arr @ U_arr.mT).mean(0)
     eigvals, eigvecs = torch.linalg.eigh(P_avg)
-    plt.plot(eigvals)
+    plt.plot(eigvals, torch.linspace(0, 1, eigvals.numel()))
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
     plt.title('Problem spectrum')
     print(eigvals)
     plt.show()
@@ -39,25 +41,28 @@ def main():
     #print(torch.linalg.eigvalsh(comm_W))
     #exit()
 
+    num_iter = 6
+    lo = 0.1
+
 
     # DeEPCA
     deepca = DeEPCA(comm_W, cons_rounds)
     deepca_loss_hist = []
     deepca_gen = deepca.algo_iters(U_arr)
     # DRGrAv
-    drgrav = DRGrAv(comm_W, cons_rounds, ortho_scheduler=lambda it: True)
+    drgrav = DRGrAv(num_iter, lo, comm_W, cons_rounds, ortho_scheduler=lambda it: True)
     drgrav_loss_hist = []
     drgrav_gen = drgrav.algo_iters(U_arr)
 
-    for _ in range(4):
+    for _ in range(8):
         plt.gca().clear()
 
-        # DeEPCA
-        deepca_iter_frame = next(deepca_gen)
-        deepca_loss_hist.append(
-            (util.grassmannian_dist(deepca_iter_frame.U, U_the)**2).mean(0)
-        )
-        plt.semilogy(deepca_loss_hist, '-x', label='deepca')
+        ## DeEPCA
+        #deepca_iter_frame = next(deepca_gen)
+        #deepca_loss_hist.append(
+        #    (util.grassmannian_dist(deepca_iter_frame.U, U_the)**2).mean(0)
+        #)
+        #plt.semilogy(deepca_loss_hist, '-x', label='deepca')
         # DRGrAv
         drgrav_iter_frame = next(drgrav_gen)
         drgrav_loss_hist.append(
