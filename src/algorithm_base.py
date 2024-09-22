@@ -77,7 +77,7 @@ class GrassmannianAveragingAlgorithm(ABC):
             decentralized algorithms
         """
         gen = self.algo_iters(U_arr)
-        for i in range(max_iter):
+        for i in range(max_iter+1):
             iter_frame = next(gen)
             if tol is not None:
                 if not hasattr(iter_frame, 'err_criterion'):
