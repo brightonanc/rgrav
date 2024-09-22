@@ -18,7 +18,7 @@ class DBPM(DecentralizedConsensusAlgorithm):
     def algo_iters(self, U_arr):
         it = 0
         iter_frame = SimpleNamespace()
-        U = util.get_standard_basis_like(U_arr)
+        U = self.get_U0(U_arr)
         iter_frame.U = U
         yield iter_frame
         while True:

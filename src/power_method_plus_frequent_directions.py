@@ -7,10 +7,13 @@ from . import util
 
 class PMFD(GrassmannianAveragingAlgorithm):
 
+    def __init__(self):
+        super().__init__()
+
     def algo_iters(self, U_arr):
         iter_frame = SimpleNamespace()
         M, N, K = U_arr.shape
-        Q = util.get_standard_basis_like(U_arr[0])
+        Q = self.get_U0(U_arr)
         B = U_arr.new_zeros(N, 2*K)
         iter_frame.U = Q
         yield iter_frame
@@ -39,7 +42,7 @@ class DPMFD(DecentralizedConsensusAlgorithm):
     def algo_iters(self, U_arr):
         iter_frame = SimpleNamespace()
         M, N, K = U_arr.shape
-        Q = util.get_standard_basis_like(U_arr)
+        Q = self.get_U0(U_arr)
         B = U_arr.new_zeros(M, N, 2*K)
         iter_frame.U = Q
         yield iter_frame

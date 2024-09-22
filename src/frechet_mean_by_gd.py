@@ -1,5 +1,6 @@
 import torch
 from types import SimpleNamespace
+import warnings
 
 from .algorithm_base import GrassmannianAveragingAlgorithm
 from . import util
@@ -16,12 +17,24 @@ class FrechetMeanByGradientDescent(GrassmannianAveragingAlgorithm):
         init_idx : int
             The index of the initial point used for averaging
         """
+        super().__init__()
         self.eta = eta
         self.init_idx = init_idx
 
+    def get_U0(self, U_arr):
+        if self.U0 is None:
+            self.U0 = U_arr[self.init_idx].clone()
+        elif self.init_idx is not None:
+            warnings.warn(
+                'FrechetMeanByGradientDescent: init_idx was non-None yet an'
+                ' initial U0 was provided. The U0 will be used and the'
+                ' init_idx will be ignored.'
+            )
+        return self.U0
+
     def algo_iters(self, U_arr):
         iter_frame = SimpleNamespace()
-        U = U_arr[self.init_idx].clone()
+        U = self.get_U0(U_arr)
         iter_frame.U = U
         iter_frame.err_criterion = torch.nan
         yield iter_frame

@@ -9,6 +9,9 @@ from . import util
 class EPCA(GrassmannianAveragingAlgorithm):
     """ A centralized variant of DeEPCA """
 
+    def __init__(self):
+        super().__init__()
+
     def _sign_adjust(self, W, W0):
         tmp = (W.mT[..., None, :] @ W0.mT[..., :, None]).squeeze((-1,-2))
         W *= tmp.sign()[..., None, :]
@@ -16,7 +19,7 @@ class EPCA(GrassmannianAveragingAlgorithm):
 
     def algo_iters(self, U_arr):
         iter_frame = SimpleNamespace()
-        W0 = util.get_standard_basis_like(U_arr[0])
+        W0 = self.get_U0(U_arr)
         W = W0
         S = W0.clone()
         AW = W0.clone()
@@ -37,11 +40,10 @@ class EPCA(GrassmannianAveragingAlgorithm):
             yield iter_frame
 
 
-class DeEPCA(GrassmannianAveragingAlgorithm):
+class DeEPCA(DecentralizedConsensusAlgorithm):
 
     def __init__(self, comm_W, cons_rounds=8):
-        self.comm_W = comm_W
-        self.cons_rounds = cons_rounds
+        super().__init__(comm_W, cons_rounds)
         # Precompute eta
         lamb2 = torch.linalg.eigvalsh(self.comm_W)[-2].abs()
         tmp = (1 - (lamb2**2))**0.5
@@ -65,7 +67,7 @@ class DeEPCA(GrassmannianAveragingAlgorithm):
 
     def algo_iters(self, U_arr):
         iter_frame = SimpleNamespace()
-        W0 = util.get_standard_basis_like(U_arr)
+        W0 = self.get_U0(U_arr)
         W = W0
         S = W0.clone()
         AW = W0.clone()

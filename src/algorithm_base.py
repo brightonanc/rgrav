@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from . import util
+
 
 def get_constant_period_scheduler(period, offset=0):
     """
@@ -56,6 +58,17 @@ class GrassmannianAveragingAlgorithm(ABC):
     """
     The base class for a Grassmannian averaging algorithm
     """
+
+    def __init__(self):
+        self.U0 = None
+
+    def set_U0(self, U0):
+        self.U0 = U0
+
+    def get_U0(self, U_arr):
+        if self.U0 is None:
+            self.U0 = util.get_standard_basis_like(U_arr[0])
+        return self.U0
 
     def average(self, U_arr, max_iter=64, tol=None):
         """
@@ -126,8 +139,14 @@ class DecentralizedConsensusAlgorithm(GrassmannianAveragingAlgorithm):
         cons_rounds : int
             The number of rounds for consensus
         """
+        super().__init__()
         self.comm_W = comm_W
         self.cons_rounds = cons_rounds
+
+    def get_U0(self, U_arr):
+        if self.U0 is None:
+            self.U0 = util.get_standard_basis_like(U_arr)
+        return self.U0
 
     def _consensus(self, X):
         """

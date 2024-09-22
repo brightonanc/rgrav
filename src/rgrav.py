@@ -150,6 +150,7 @@ def get_rgrav_roots(N, lo):
 class RGrAv(GrassmannianAveragingAlgorithm):
 
     def __init__(self, num_iter, lo, mode='qr-stable', ortho_scheduler=None):
+        super().__init__()
         self.num_iter = num_iter
         self.root_arr = get_rgrav_roots(num_iter, lo)
         self.mode = mode
@@ -160,7 +161,7 @@ class RGrAv(GrassmannianAveragingAlgorithm):
     def algo_iters(self, U_arr):
         it = 0
         iter_frame = SimpleNamespace()
-        U = util.get_standard_basis_like(U_arr[0])
+        U = self.get_U0(U_arr)
         iter_frame.U = U
         yield iter_frame
         while True:
@@ -185,6 +186,7 @@ class RGrAv(GrassmannianAveragingAlgorithm):
 class RGrAv2(GrassmannianAveragingAlgorithm):
 
     def __init__(self, lo, mode='qr-stable', ortho_scheduler=None):
+        super().__init__()
         self.lo = lo
         self.mode = mode
         if ortho_scheduler is None:
@@ -194,7 +196,7 @@ class RGrAv2(GrassmannianAveragingAlgorithm):
     def algo_iters(self, U_arr):
         it = 0
         iter_frame = SimpleNamespace()
-        U = util.get_standard_basis_like(U_arr[0])
+        U = self.get_U0(U_arr)
         gamma = (2 / self.lo) - 1
         a = [1, gamma]
         iter_frame.U = U
@@ -232,8 +234,9 @@ class FiniteRGrAv(GrassmannianAveragingAlgorithm):
 
     def __init__(self, alpha, num_iter, zero_first=False, mode='qr-stable',
              ortho_scheduler=None):
-        self.num_iter = num_iter
+        super().__init__()
         self.root_arr = ChebyshevMagicNumbers(alpha).get_root_arr(num_iter)
+        self.num_iter = num_iter
         if zero_first:
             self.root_arr = self.root_arr.flip(0)
         self.mode = mode
@@ -244,7 +247,7 @@ class FiniteRGrAv(GrassmannianAveragingAlgorithm):
     def algo_iters(self, U_arr):
         it = 0
         iter_frame = SimpleNamespace()
-        U = util.get_standard_basis_like(U_arr[0])
+        U = self.get_U0(U_arr)
         iter_frame.U = U
         iter_frame.within_num_iter = True
         yield iter_frame
@@ -278,6 +281,7 @@ class FiniteRGrAv(GrassmannianAveragingAlgorithm):
 class AsymptoticRGrAv(GrassmannianAveragingAlgorithm):
 
     def __init__(self, alpha, mode='qr-stable', ortho_scheduler=None):
+        super().__init__()
         self.cmn = ChebyshevMagicNumbers(alpha)
         self.mode = mode
         if ortho_scheduler is None:
@@ -287,7 +291,7 @@ class AsymptoticRGrAv(GrassmannianAveragingAlgorithm):
     def algo_iters(self, U_arr):
         it = 0
         iter_frame = SimpleNamespace()
-        U = util.get_standard_basis_like(U_arr[0])
+        U = self.get_U0(U_arr)
         iter_frame.U = U
         yield iter_frame
         while True:
@@ -312,14 +316,13 @@ class AsymptoticRGrAv(GrassmannianAveragingAlgorithm):
             yield iter_frame
 
 
-class DRGrAv(GrassmannianAveragingAlgorithm):
+class DRGrAv(DecentralizedConsensusAlgorithm):
 
     def __init__(self, num_iter, lo, comm_W, cons_rounds=8, mode='qr-stable',
             ortho_scheduler=None):
+        super().__init__(comm_W, cons_rounds)
         self.num_iter = num_iter
         self.root_arr = get_rgrav_roots(num_iter, lo)
-        self.comm_W = comm_W
-        self.cons_rounds = cons_rounds
         self.mode = mode
         if ortho_scheduler is None:
             ortho_scheduler = lambda it: True
@@ -354,7 +357,7 @@ class DRGrAv(GrassmannianAveragingAlgorithm):
     def algo_iters(self, U_arr):
         it = 0
         iter_frame = SimpleNamespace()
-        U = util.get_standard_basis_like(U_arr)
+        U = self.get_U0(U_arr)
         iter_frame.U = U
         yield iter_frame
         while True:
@@ -382,14 +385,13 @@ class DRGrAv(GrassmannianAveragingAlgorithm):
             yield iter_frame
 
 
-class DRGrAv2(GrassmannianAveragingAlgorithm):
+class DRGrAv2(DecentralizedConsensusAlgorithm):
 
     def __init__(self, num_iter, lo, comm_W, cons_rounds=8, mode='qr-stable',
             ortho_scheduler=None):
+        super().__init__(comm_W, cons_rounds)
         self.num_iter = num_iter
         self.root_arr = get_rgrav_roots(num_iter, lo)
-        self.comm_W = comm_W
-        self.cons_rounds = cons_rounds
         self.mode = mode
         if ortho_scheduler is None:
             ortho_scheduler = lambda it: True
@@ -424,7 +426,7 @@ class DRGrAv2(GrassmannianAveragingAlgorithm):
     def algo_iters(self, U_arr):
         it = 0
         iter_frame = SimpleNamespace()
-        U = util.get_standard_basis_like(U_arr)
+        U = self.get_U0(U_arr)
         prev_upd = torch.zeros_like(U)
         iter_frame.U = U
         yield iter_frame
