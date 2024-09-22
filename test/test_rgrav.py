@@ -15,12 +15,11 @@ from src import util, HypercubeGraph
 #    assert 1e-8 > err
 
 
-@pytest.mark.filterwarnings('ignore:ChebyshevMagicNumber')
 def test_FiniteRGrAv(U_arr):
     P_avg = (U_arr @ U_arr.mT).mean(0)
     eigval, eigvec = torch.linalg.eigh(P_avg)
     U_the = eigvec[:, -U_arr.shape[-1]:]
-    alpha_ideal = eigval[eigval.diff().argmin()].item()
+    alpha_ideal = eigval[eigval.diff().argmax()].item()
     num_iter = 64
     algo = FiniteRGrAv(alpha_ideal, num_iter)
     U_emp = algo.average(U_arr, max_iter=num_iter)
@@ -32,7 +31,7 @@ def test_AsymptoticRGrAv(U_arr):
     P_avg = (U_arr @ U_arr.mT).mean(0)
     eigval, eigvec = torch.linalg.eigh(P_avg)
     U_the = eigvec[:, -U_arr.shape[-1]:]
-    alpha_ideal = eigval[eigval.diff().argmin()].item()
+    alpha_ideal = eigval[eigval.diff().argmax()].item()
     algo = AsymptoticRGrAv(alpha_ideal)
     U_emp = algo.average(U_arr, max_iter=64)
     err = util.grassmannian_dist(U_emp, U_the)**2
