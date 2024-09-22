@@ -45,9 +45,6 @@ class RGravClustering:
             if len(losses) > 1 and losses[-1] >= losses[-2]:
                 break
 
-        plt.figure()
-        plt.plot(losses)
-        plt.show()
         return U_centers
 
 
@@ -64,11 +61,13 @@ def random_grassmann_tangent(U):
 
 if __name__ == "__main__":
     N = 100; K = 10
-    N = 10; K = 3
+    # N = 10; K = 3
     n_points = 100
-    n_centers = 3
+    n_centers = 10
     center_dist = 0.5
     center_radius = 0.1
+    center_dist = 1.0
+    center_radius = 0.01
 
     # generate synthetic data
     U_center = random_grassmann_point(N, K)
@@ -101,3 +100,15 @@ if __name__ == "__main__":
     rgrav_clustering = RGravClustering()
     clusters = rgrav_clustering.cluster(points, n_centers)
 
+    closest_centers = []
+    for cluster in clusters:
+        dists = torch.stack([grassmannian_dist(Uc, cluster) for Uc in U_centers])
+        closest_centers.append(torch.argmin(dists))
+
+    cluster_dists = []
+    for i in range(n_centers):
+        cluster_dist = grassmannian_dist(U_centers[i], clusters[i])
+        cluster_dists.append(cluster_dist)
+
+    print('cluster distances', cluster_dists)
+    print('closest centers', closest_centers)
