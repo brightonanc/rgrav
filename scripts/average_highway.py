@@ -60,6 +60,12 @@ if __name__ == '__main__':
     plt.plot(U_dists0)
 
     final_U = U_iters[-1]
+    # compute approximate eigenvalues
+    evals = torch.linalg.norm(final_U.T @ X, dim=1) ** 2
+    plt.figure()
+    plt.suptitle('Eigenvalues of data using final U')
+    plt.plot(evals)
+
     for d in range(3):
         final_im = final_U[:, d].reshape(im_shape)
         final_im = (final_im - final_im.min()) / (final_im.max() - final_im.min())
