@@ -59,7 +59,13 @@ class SUMMET_Loader():
 
 if __name__ == '__main__':
     summet_loader = SUMMET_Loader()
-    print(summet_loader.tracklets[0].shape)
+    track = summet_loader.load_data(1)
+    print(track.shape)
+    import matplotlib.pyplot as plt
+    plt.figure()
+    for i in range(len(track)):
+        plt.imshow(track[i])
+        plt.pause(0.2)
     exit()
     loader = Loader_CDW('highway')
     print('n_samples: ', loader.n_samples)
