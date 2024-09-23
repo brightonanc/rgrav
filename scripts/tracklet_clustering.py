@@ -15,21 +15,27 @@ from data_sources.video_separation import SUMMET_Loader
 summet_loader = SUMMET_Loader()
 tracklets = summet_loader.tracklets
 labels = summet_loader.labels
+
+# trim to a few tracklets for testing
+tracklets = tracklets[:500]
+labels = labels[:500]
+
 unique_labels = set(labels)
 n_labels = len(unique_labels)
 print('unique labels: ', n_labels, unique_labels)
 
-# trim to a few tracklets for testing
-# tracklets = tracklets[:100]
+tracklets_flat = tracklets.reshape(tracklets.shape[0], tracklets.shape[1], -1).permute(2, 1, 0)
 
-tracklets_flat = tracklets.reshape(tracklets.shape[0], tracklets.shape[1], -1).mT
-points = []
-U_labels = []
+print('tracklets: ', tracklets.shape)
+print('flat: ', tracklets_flat.shape)
+print('labels: ', len(labels))
 
 K = 12
 n_subs = tracklets.shape[1] // K
 assert n_subs * K == tracklets.shape[1]
 n_tracklets = tracklets.shape[0]
+points = []
+U_labels = []
 
 for i in range(n_subs):
     for j in range(n_tracklets):
@@ -39,10 +45,6 @@ for i in range(n_subs):
         U_labels.append(labels[j])
 U_arr = torch.stack(points, dim=0)
 print('U_arr: ', U_arr.shape)
-
-print('tracklets: ', tracklets.shape)
-print('flat: ', tracklets_flat.shape)
-print('labels: ', len(labels))
 
 clustering_algo = SubspaceClustering(AsymptoticRGrAv(0.5))
 clusters = clustering_algo.cluster(U_arr, n_centers=n_labels)
