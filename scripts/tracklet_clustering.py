@@ -22,16 +22,17 @@ print('unique labels: ', n_labels, unique_labels)
 # trim to a few tracklets for testing
 # tracklets = tracklets[:100]
 
-tracklets_flat = tracklets.reshape(tracklets.shape[0], tracklets.shape[1], -1).T
+tracklets_flat = tracklets.reshape(tracklets.shape[0], tracklets.shape[1], -1).mT
 points = []
 U_labels = []
 
 K = 12
 n_subs = tracklets.shape[1] // K
 assert n_subs * K == tracklets.shape[1]
+n_tracklets = tracklets.shape[0]
 
 for i in range(n_subs):
-    for j in range(tracklets.shape[-1]):
+    for j in range(n_tracklets):
         tracklet_batch = tracklets_flat[:, i * K:(i + 1) * K, j]
         U = torch.linalg.qr(tracklet_batch).Q
         points.append(U)
@@ -64,6 +65,7 @@ for i in range(len(clusters)):
             cluster_labels[i].append(U_labels[j])
 
     cluster_labels[i] = set(cluster_labels[i])
+    print('cluster', i, 'label: ', cluster_labels[i])
 
 plt.figure()
 plt.bar(list(cluster_labels.keys()), [len(cluster_labels[i]) for i in cluster_labels.keys()])
