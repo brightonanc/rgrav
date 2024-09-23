@@ -26,7 +26,7 @@ def test_FiniteRGrAv(U_arr):
     err = util.grassmannian_dist(U_emp, U_the)**2
     assert 1e-8 > err
 
-@pytest.mark.filterwarnings('ignore:ChebyshevMagicNumber')
+@pytest.mark.filterwarnings('ignore:ChebyshevMagicNumbers')
 def test_AsymptoticRGrAv(U_arr):
     P_avg = (U_arr @ U_arr.mT).mean(0)
     eigval, eigvec = torch.linalg.eigh(P_avg)

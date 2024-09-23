@@ -6,9 +6,7 @@ from .algorithm_base import GrassmannianAveragingAlgorithm, \
 from . import util
 
 class PMFD(GrassmannianAveragingAlgorithm):
-
-    def __init__(self):
-        super().__init__()
+    """ See https://ieeexplore.ieee.org/document/8367212 """
 
     def algo_iters(self, U_arr):
         iter_frame = SimpleNamespace()
@@ -36,9 +34,6 @@ class PMFD(GrassmannianAveragingAlgorithm):
 
 class DPMFD(DecentralizedConsensusAlgorithm):
 
-    def __init__(self, comm_W, cons_rounds=8):
-        super().__init__(comm_W, cons_rounds)
-
     def algo_iters(self, U_arr):
         iter_frame = SimpleNamespace()
         M, N, K = U_arr.shape
@@ -49,7 +44,7 @@ class DPMFD(DecentralizedConsensusAlgorithm):
         while True:
             iter_frame = SimpleNamespace()
             Z_arr = U_arr @ (U_arr.mT @ Q)
-            Z_hat = self._consensus(Z_arr)
+            Z_hat = self.consensus(Z_arr)
             U, _, Vh = torch.linalg.svd(Z_hat, full_matrices=False)
             Q = U @ Vh
             B[..., K:] = Q

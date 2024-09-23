@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from src.algorithm_base import get_constant_period_scheduler, \
-        get_geometric_period_scheduler, DecentralizedConsensusAlgorithm
+        get_geometric_period_scheduler
 
 @pytest.mark.parametrize('period, offset, expected', (
     (1, 0, range(100)),
@@ -30,20 +30,3 @@ def test_geometric_period_scheduler(factor, period, offset, expected):
     scheduler = get_geometric_period_scheduler(factor, period, offset)
     res = [x for x in range(100) if scheduler(x)]
     assert tuple(res) == tuple(expected)
-
-def test_consensus():
-    comm_W = (1/3) * torch.tensor([
-        [0., 1, 1, 1],
-        [1, 0, 1, 1],
-        [1, 1, 0, 1],
-        [1, 1, 1, 0],
-    ], dtype=torch.float64)
-    cons_rounds = 100
-    class Algo(DecentralizedConsensusAlgorithm):
-        def algo_iters(self, U_arr):
-            pass
-    algo = Algo(comm_W, cons_rounds)
-    X = torch.randn(4, 10, 8, 3, dtype=torch.float64)
-    X_cons = algo._consensus(X)
-    X_mean = X.mean(0)
-    assert 1e-12 > (X_cons - X_mean[None]).abs().max()

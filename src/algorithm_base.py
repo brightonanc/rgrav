@@ -129,44 +129,18 @@ class DecentralizedConsensusAlgorithm(GrassmannianAveragingAlgorithm):
     The base class for a decentralized Grassmannian averaging algorithm
     """
 
-    def __init__(self, comm_W, cons_rounds):
+    def __init__(self, consensus):
         """
         Parameters
         ----------
-        comm_W : tensor[M, M]
-            Consensus communication matrix such that comm_W @ 1 = 1 and
-            |lambda2(comm_W)| < 1
-        cons_rounds : int
-            The number of rounds for consensus
+        consensus : ConsensusMethod
+            The method by which consensus will be performed
         """
         super().__init__()
-        self.comm_W = comm_W
-        self.cons_rounds = cons_rounds
+        self.consensus = consensus
 
     def get_U0(self, U_arr):
         if self.U0 is None:
             self.U0 = util.get_standard_basis_like(U_arr)
         return self.U0
-
-    def _consensus(self, X):
-        """
-        Computes average consensus
-
-        Parameters
-        ----------
-        X : tensor[M, ...]
-            Tensor to be averaged over the first dim
-
-        Returns
-        -------
-        X_cons : tensor[M, ...]
-            The consensus averaged tensors
-        """
-        shape_X = X.shape
-        X_ = X.view(shape_X[0], -1)
-        for _ in range(self.cons_rounds):
-            X_ = self.comm_W @ X_
-        X_cons = X_.view(shape_X)
-        return X_cons
-
 
