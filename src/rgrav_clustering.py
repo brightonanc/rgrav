@@ -112,3 +112,15 @@ if __name__ == "__main__":
 
     print('cluster distances', cluster_dists)
     print('closest centers', closest_centers)
+
+    all_cluster_dists = []
+    for i in range(n_centers):
+        all_cluster_dists.append([])
+        for j in range(n_centers):
+            all_cluster_dists[i].append(grassmannian_dist(clusters[i], U_centers[j]))
+
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.imshow(all_cluster_dists)
+    plt.colorbar()
+    plt.show()
