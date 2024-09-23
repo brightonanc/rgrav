@@ -48,17 +48,6 @@ class RGravClustering:
         return U_centers
 
 
-def random_grassmann_point(N, K):
-    U = torch.linalg.qr(torch.randn(N, K)).Q
-    return U
-
-def random_grassmann_tangent(U):
-    N, K = U.shape
-    H = torch.randn(N, K)
-    H = H - U @ (U.T @ H)
-    H /= torch.linalg.norm(H)
-    return H
-
 if __name__ == "__main__":
     N = 100; K = 10
     # N = 10; K = 3
@@ -70,10 +59,10 @@ if __name__ == "__main__":
     center_radius = 0.01
 
     # generate synthetic data
-    U_center = random_grassmann_point(N, K)
+    U_center = random_grassmannian_point(N, K)
     U_centers = []
     for _ in range(n_centers):
-        H = random_grassmann_tangent(U_center)
+        H = random_grassmannian_tangent(U_center)
         H *= center_dist
         U_centers.append(grassmannian_exp(U_center, H))
 
@@ -88,7 +77,7 @@ if __name__ == "__main__":
     for i in range(n_centers):
         Uc = U_centers[i]
         for _ in range(n_points):
-            H = random_grassmann_tangent(Uc)
+            H = random_grassmannian_tangent(Uc)
             H *= torch.rand(1).item() * center_radius
             point = grassmannian_exp(Uc, H)
             points.append(point)

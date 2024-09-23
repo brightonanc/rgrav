@@ -174,3 +174,13 @@ def get_random_clustered_grassmannian_points(N, K, M, radius, Q_center=None):
             + (Q_center[:, K:] @ (U * s[:, None, :]))
     return U_arr
 
+def random_grassmannian_point(N, K):
+    U = torch.linalg.qr(torch.randn(N, K)).Q
+    return U
+
+def random_grassmannian_tangent(U):
+    N, K = U.shape
+    H = torch.randn(N, K)
+    H = H - U @ (U.T @ H)
+    H /= torch.linalg.norm(H)
+    return H
