@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import torch
 
-from .chebyshev import ChebyshevMagicNumbers
+from .chebyshev import ChebyshevMagicNumbers, BalancedChebyshevMagicNumbers
 from . import util
 
 
@@ -123,6 +123,45 @@ class ChebyshevConsensus(ConsensusMethod):
                 b = self.cmn.b(it)
                 c = self.cmn.c(it)
                 next_X_ = a * ((self.comm_W @ X_) + (b * X_) + (c * prev_X_))
+            prev_X_ = X_
+            X_ = next_X_
+        X = X_.view(shape_X)
+        return X
+
+class BalancedChebyshevConsensus(ConsensusMethod):
+    """
+    Implements an accelerated consensus procedure using Chebyshev polynomials
+    """
+    def __init__(self, comm_W, cons_rounds=8, lambda2=None):
+        """
+        Parameters
+        ----------
+        comm_W : tensor[M, M]
+            Symmetric consensus communication matrix such that the ones vector
+            is an eigenvector (with eigenvalue 1) and the spectral radius of
+            (comm_W - (1/M) 1 1^T) is strictly less than 1
+        cons_rounds : int
+            The number of rounds for consensus
+        lambda2 : float
+            The estimate of the spectral radius of (comm_W - (1/M) 1 1^T). If
+            not supplied, it will be computed exactly from comm_W
+        """
+        self.comm_W = comm_W
+        self.cons_rounds = cons_rounds
+        if lambda2 is None:
+            eigvals = torch.linalg.eigvalsh(self.comm_W)
+            lambda2 = max(-eigvals[0].item(), eigvals[-2].item())
+        self.cmn = BalancedChebyshevMagicNumbers(lambda2)
+    def __call__(self, X):
+        shape_X = X.shape
+        X_ = X.reshape(shape_X[0], -1)
+        for it in range(1, self.cons_rounds+1):
+            if 1 == it:
+                next_X_ = self.comm_W @ X_
+            else:
+                a = self.cmn.a(it)
+                c = self.cmn.c(it)
+                next_X_ = a * ((self.comm_W @ X_) + (c * prev_X_))
             prev_X_ = X_
             X_ = next_X_
         X = X_.view(shape_X)

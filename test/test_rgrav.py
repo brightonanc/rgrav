@@ -49,6 +49,7 @@ def test_FiniteDRGrAv(U_arr):
     err = (util.grassmannian_dist(U_emp, U_the)**2).max()
     assert 1e-8 > err
 
+@pytest.mark.filterwarnings('ignore:ChebyshevMagicNumbers')
 def test_AsymptoticDRGrAv(U_arr):
     consensus = SimpleConsensus(
         HypercubeGraph.get_positive_optimal_lapl_based_comm_W(
