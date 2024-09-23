@@ -308,6 +308,47 @@ class AsymptoticRGrAv(GrassmannianAveragingAlgorithm):
             do_ortho = self.ortho_scheduler(it)
             prev_U = U
             if do_ortho:
+                U, (prev_U,) = util.get_orthobasis(
+                    Z_hat,
+                    mode=self.mode,
+                    others_X=(prev_U,)
+                )
+            else:
+                U = Z_hat
+            iter_frame.U = U
+            iter_frame.do_ortho = do_ortho
+            yield iter_frame
+
+class AsymptoticRGrAv2(GrassmannianAveragingAlgorithm):
+
+    def __init__(self, alpha, mode='qr-stable', ortho_scheduler=None):
+        super().__init__()
+        self.cmn = ChebyshevMagicNumbers(alpha)
+        self.mode = mode
+        if ortho_scheduler is None:
+            ortho_scheduler = lambda it: True
+        self.ortho_scheduler = ortho_scheduler
+
+    def algo_iters(self, U_arr):
+        it = 0
+        iter_frame = SimpleNamespace()
+        U = self.get_U0(U_arr)
+        iter_frame.U = U
+        yield iter_frame
+        while True:
+            it += 1
+            iter_frame = SimpleNamespace()
+            if 1 == it:
+                Z = U_arr @ (U_arr.mT @ U)
+            else:
+                a = self.cmn.a(it)
+                b = self.cmn.b(it)
+                c = self.cmn.c(it)
+                Z = a * ((U_arr @ (U_arr.mT @ U)) + (b * U) + (c * prev_U))
+            Z_hat = Z.mean(0)
+            do_ortho = self.ortho_scheduler(it)
+            prev_U = U
+            if do_ortho:
                 U = util.get_orthobasis(Z_hat, mode=self.mode)
             else:
                 U = Z_hat
@@ -454,3 +495,291 @@ class DRGrAv2(DecentralizedConsensusAlgorithm):
             iter_frame.do_ortho = do_ortho
             yield iter_frame
 
+
+class FiniteDRGrAv(DecentralizedConsensusAlgorithm):
+
+    def __init__(self, alpha, num_iter, comm_W, cons_rounds=8,
+             zero_first=False, mode='qr-stable', ortho_scheduler=None):
+        super().__init__(comm_W, cons_rounds)
+        self.root_arr = ChebyshevMagicNumbers(alpha).get_root_arr(num_iter)
+        self.num_iter = num_iter
+        if zero_first:
+            self.root_arr = self.root_arr.flip(0)
+        self.mode = mode
+        if ortho_scheduler is None:
+            ortho_scheduler = lambda it: True
+        self.ortho_scheduler = ortho_scheduler
+        # Precompute eta
+        lamb2 = torch.linalg.eigvalsh(self.comm_W)[-2].abs()
+        tmp = (1 - (lamb2**2))**0.5
+        self.eta = (1 - tmp) / (1 + tmp)
+
+    def _fast_mix(self, S):
+        M, N, K = S.shape
+        S_ = S.reshape(M, N*K)
+        prev_S_ = S_.clone()
+        for _ in range(self.cons_rounds):
+            next_S_ = ((1+self.eta) * self.comm_W @ S_) - (self.eta * prev_S_)
+            prev_S_ = S_
+            S_ = next_S_
+        S = S_.view(M, N, K)
+        return S
+
+    def algo_iters(self, U_arr):
+        it = 0
+        iter_frame = SimpleNamespace()
+        U = self.get_U0(U_arr)
+        iter_frame.U = U
+        iter_frame.within_num_iter = True
+        yield iter_frame
+        while True:
+            it += 1
+            iter_frame = SimpleNamespace()
+            within_num_iter = (it-1) < self.num_iter
+            if not within_num_iter:
+                warnings.warn(
+                    'FiniteDRGrAv: algorithm is now running longer than'
+                    ' originally specified by num_iter'
+                )
+            root = self.root_arr[it-1] if within_num_iter else 0.
+            fac0 = 1 / (1 - root)
+            fac1 = root / (1 - root)
+            term0 = fac0 * (U_arr @ (U_arr.mT @ U))
+            term1 = fac1 * U
+            Y = term0 - term1
+            if 1 == it:
+                Z = Y
+            else:
+                Z = Z_hat - prev_Y + Y
+            Z_hat = self._fast_mix(Z)
+            do_ortho = self.ortho_scheduler(it)
+            if do_ortho:
+                U, (Z_hat, Y) = util.get_orthobasis(
+                    Z_hat,
+                    mode=self.mode,
+                    others_X=(Z_hat, Y),
+                )
+            else:
+                U = Z_hat
+            prev_Y = Y
+            iter_frame.U = U
+            iter_frame.do_ortho = do_ortho
+            iter_frame.within_num_iter = within_num_iter
+            yield iter_frame
+
+
+class FiniteDRGrAv2(DecentralizedConsensusAlgorithm):
+
+    def __init__(self, alpha, num_iter, comm_W, cons_rounds=8,
+             zero_first=False, mode='qr-stable', ortho_scheduler=None):
+        super().__init__(comm_W, cons_rounds)
+        self.root_arr = ChebyshevMagicNumbers(alpha).get_root_arr(num_iter)
+        self.num_iter = num_iter
+        if zero_first:
+            self.root_arr = self.root_arr.flip(0)
+        self.mode = mode
+        if ortho_scheduler is None:
+            ortho_scheduler = lambda it: True
+        self.ortho_scheduler = ortho_scheduler
+        # Precompute eta
+        lamb2 = torch.linalg.eigvalsh(self.comm_W)[-2].abs()
+        tmp = (1 - (lamb2**2))**0.5
+        self.eta = (1 - tmp) / (1 + tmp)
+
+    def _fast_mix(self, S):
+        M, N, K = S.shape
+        S_ = S.reshape(M, N*K)
+        prev_S_ = S_.clone()
+        for _ in range(self.cons_rounds):
+            next_S_ = ((1+self.eta) * self.comm_W @ S_) - (self.eta * prev_S_)
+            prev_S_ = S_
+            S_ = next_S_
+        S = S_.view(M, N, K)
+        return S
+
+    def algo_iters(self, U_arr):
+        it = 0
+        iter_frame = SimpleNamespace()
+        U = self.get_U0(U_arr)
+        iter_frame.U = U
+        iter_frame.within_num_iter = True
+        yield iter_frame
+        while True:
+            it += 1
+            iter_frame = SimpleNamespace()
+            within_num_iter = (it-1) < self.num_iter
+            if not within_num_iter:
+                warnings.warn(
+                    'FiniteDRGrAv: algorithm is now running longer than'
+                    ' originally specified by num_iter'
+                )
+            root = self.root_arr[it-1] if within_num_iter else 0.
+            fac0 = 1 / (1 - root)
+            fac1 = root / (1 - root)
+            term0 = fac0 * (U_arr @ (U_arr.mT @ U))
+            term1 = fac1 * U
+            Y = term0 - term1
+            if 1 == it:
+                Z = Y
+            else:
+                Z = Z_hat - prev_Y + Y
+            Z_hat = self._fast_mix(Z)
+            do_ortho = self.ortho_scheduler(it)
+            if do_ortho:
+                U = util.get_orthobasis(Z_hat, mode=self.mode)
+            else:
+                U = Z_hat
+            prev_Y = Y
+            iter_frame.U = U
+            iter_frame.do_ortho = do_ortho
+            iter_frame.within_num_iter = within_num_iter
+            yield iter_frame
+
+
+class FiniteDRGrAv3(DecentralizedConsensusAlgorithm):
+
+    def __init__(self, alpha, num_iter, comm_W, cons_rounds=8,
+            cons_rounds_S=None, zero_first=False, mode='qr-stable',
+            ortho_scheduler=None):
+        super().__init__(comm_W, cons_rounds)
+        self.root_arr = ChebyshevMagicNumbers(alpha).get_root_arr(num_iter)
+        self.num_iter = num_iter
+        if cons_rounds_S is None:
+            cons_rounds_S = cons_rounds * 10
+        self.cons_rounds_S = cons_rounds_S
+        if zero_first:
+            self.root_arr = self.root_arr.flip(0)
+        self.mode = mode
+        if ortho_scheduler is None:
+            ortho_scheduler = lambda it: True
+        self.ortho_scheduler = ortho_scheduler
+        # Precompute eta
+        lamb2 = torch.linalg.eigvalsh(self.comm_W)[-2].abs()
+        tmp = (1 - (lamb2**2))**0.5
+        self.eta = (1 - tmp) / (1 + tmp)
+
+    def _consensus_S(self, S):
+        tmp = self.cons_rounds
+        self.cons_rounds = self.cons_rounds_S
+        S = self._fast_mix(S)
+        S = S.mean(0, keepdim=True)
+        self.cons_rounds = tmp
+        return S
+
+    def _fast_mix(self, S):
+        M, N, K = S.shape
+        S_ = S.reshape(M, N*K)
+        prev_S_ = S_.clone()
+        for _ in range(self.cons_rounds):
+            next_S_ = ((1+self.eta) * self.comm_W @ S_) - (self.eta * prev_S_)
+            prev_S_ = S_
+            S_ = next_S_
+        S = S_.view(M, N, K)
+        return S
+
+    def algo_iters(self, U_arr):
+        it = 0
+        iter_frame = SimpleNamespace()
+        U = self.get_U0(U_arr)
+        iter_frame.U = U
+        iter_frame.within_num_iter = True
+        yield iter_frame
+        while True:
+            it += 1
+            iter_frame = SimpleNamespace()
+            within_num_iter = (it-1) < self.num_iter
+            if not within_num_iter:
+                warnings.warn(
+                    'FiniteDRGrAv: algorithm is now running longer than'
+                    ' originally specified by num_iter'
+                )
+            root = self.root_arr[it-1] if within_num_iter else 0.
+            fac0 = 1 / (1 - root)
+            fac1 = root / (1 - root)
+            term0 = fac0 * (U_arr @ (U_arr.mT @ U))
+            term1 = fac1 * U
+            Y = term0 - term1
+            if 1 == it:
+                Z = Y
+            else:
+                Z = Z_hat - prev_Y + Y
+            Z_hat = self._fast_mix(Z)
+            do_ortho = self.ortho_scheduler(it)
+            if do_ortho:
+                _, S = util.get_orthobasis(
+                    Z_hat,
+                    mode=self.mode,
+                    return_S=True,
+                )
+                S = self._consensus_S(S)
+                Z_hat = Z_hat @ S
+                U = Z_hat
+                Y = Y @ S
+            else:
+                U = Z_hat
+            prev_Y = Y
+            iter_frame.U = U
+            iter_frame.do_ortho = do_ortho
+            iter_frame.within_num_iter = within_num_iter
+            yield iter_frame
+
+
+class AsymptoticDRGrAv(DecentralizedConsensusAlgorithm):
+
+    def __init__(self, alpha, comm_W, cons_rounds=8, mode='qr-stable',
+                ortho_scheduler=None):
+        super().__init__(comm_W, cons_rounds)
+        self.cmn = ChebyshevMagicNumbers(alpha)
+        self.mode = mode
+        if ortho_scheduler is None:
+            ortho_scheduler = lambda it: True
+        self.ortho_scheduler = ortho_scheduler
+        # Precompute eta
+        lamb2 = torch.linalg.eigvalsh(self.comm_W)[-2].abs()
+        tmp = (1 - (lamb2**2))**0.5
+        self.eta = (1 - tmp) / (1 + tmp)
+
+    def _fast_mix(self, S):
+        M, N, K = S.shape
+        S_ = S.reshape(M, N*K)
+        prev_S_ = S_.clone()
+        for _ in range(self.cons_rounds):
+            next_S_ = ((1+self.eta) * self.comm_W @ S_) - (self.eta * prev_S_)
+            prev_S_ = S_
+            S_ = next_S_
+        S = S_.view(M, N, K)
+        return S
+
+    def algo_iters(self, U_arr):
+        it = 0
+        iter_frame = SimpleNamespace()
+        U = self.get_U0(U_arr)
+        iter_frame.U = U
+        yield iter_frame
+        while True:
+            it += 1
+            iter_frame = SimpleNamespace()
+            if 1 == it:
+                Y = U_arr @ (U_arr.mT @ U)
+                Z = Y
+            else:
+                a = self.cmn.a(it)
+                b = self.cmn.b(it)
+                c = self.cmn.c(it)
+                Y = a * ((U_arr @ (U_arr.mT @ U)) + (b * U) + (c * prev_U))
+                Z = Z_hat - prev_Y + Y
+            Z_hat = self._fast_mix(Z)
+            do_ortho = self.ortho_scheduler(it)
+            prev_U = U
+            if do_ortho:
+                U, (prev_U,) = util.get_orthobasis(
+                    Z_hat,
+                    mode=self.mode,
+                    others_X=(prev_U,)
+                )
+            else:
+                U = Z_hat
+            prev_Y = Y
+            iter_frame.U = U
+            iter_frame.do_ortho = do_ortho
+            yield iter_frame
