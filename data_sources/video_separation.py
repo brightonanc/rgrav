@@ -9,6 +9,7 @@
 import os
 import glob
 import numpy as np
+import scipy.io
 import cv2
 import h5py
 
@@ -44,6 +45,13 @@ class Loader_CDW():
 
 class SUMMET_Loader():
     def __init__(self):
+        mat_loc = os.path.join(this_dir, 'Summet_Data/smaller_action_labels_2345.mat')
+        assert os.path.exists(mat_loc), 'summet dataset not found'
+        action_labels = scipy.io.loadmat(mat_loc)['smaller_action_labels'][0, 0]
+        labels = action_labels[2]
+        # just take the first label for each tracklet
+        self.labels = labels[:, 0]
+
         mat_loc = os.path.join(this_dir, 'Summet_Data/DARPA_tracklets_2345_09_05.mat')
         assert os.path.exists(mat_loc), 'summet dataset not found'
         with h5py.File(mat_loc, 'r') as f:
