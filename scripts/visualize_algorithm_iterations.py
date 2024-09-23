@@ -4,8 +4,9 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src import util, HypercubeGraph, DBPM, EPCA, DeEPCA, \
-        FrechetMeanByGradientDescent, PMFD, DPMFD, RGrAv, DRGrAv
+from src import util, HypercubeGraph, ChebyshevConsensus, BPM, DBPM, DeEPCA, \
+        FrechetMeanByGradientDescent, PMFD, DPMFD, FiniteRGrAv, \
+        AsymptoticRGrAv, FiniteDRGrAv, AsymptoticDRGrAv
 
 torch.set_default_dtype(torch.float64)
 
@@ -28,16 +29,24 @@ def main():
         radius=radius_ratio*(0.25*torch.pi)
     )
     P_avg = (U_arr @ U_arr.mT).mean(0)
-    U_the = torch.linalg.eigh(P_avg).eigenvectors[:, -K:]
+    eigval, eigvec = torch.linalg.eigh(P_avg)
+    U_the = eigvec[:, -K:]
 
-    comm_W = HypercubeGraph.get_positive_optimal_lapl_based_comm_W(hc_dim)
-    cons_rounds = 8
+    consensus = ChebyshevConsensus(
+        HypercubeGraph.get_positive_optimal_lapl_based_comm_W(hc_dim),
+        cons_rounds = 8,
+    )
+
+    alpha_ideal = eigval[eigval.diff().argmax()].item()
+    alpha = alpha_ideal
+
+    num_iter = 32
 
     # ============================== Centralized ==============================
-    # EPCA
-    epca = EPCA()
-    epca_loss_hist = []
-    epca_gen = epca.algo_iters(U_arr)
+    # BPM
+    bpm = BPM()
+    bpm_loss_hist = []
+    bpm_gen = bpm.algo_iters(U_arr)
     # FMGD
     fmgd = FrechetMeanByGradientDescent()
     fmgd_loss_hist = []
@@ -46,38 +55,46 @@ def main():
     pmfd = PMFD()
     pmfd_loss_hist = []
     pmfd_gen = pmfd.algo_iters(U_arr)
-    # RGrAv
-    rgrav = RGrAv()
-    rgrav_loss_hist = []
-    rgrav_gen = rgrav.algo_iters(U_arr)
+    # FiniteRGrAv
+    frgrav = FiniteRGrAv(alpha, num_iter)
+    frgrav_loss_hist = []
+    frgrav_gen = frgrav.algo_iters(U_arr)
+    # AsymptoticRGrAv
+    argrav = AsymptoticRGrAv(alpha)
+    argrav_loss_hist = []
+    argrav_gen = argrav.algo_iters(U_arr)
     # ============================= Decentralized =============================
     # DBPM
-    dbpm = DBPM(comm_W, cons_rounds, mode='qr-stable')
+    dbpm = DBPM(consensus)
     dbpm_loss_hist = []
     dbpm_gen = dbpm.algo_iters(U_arr)
     # DeEPCA
-    deepca = DeEPCA(comm_W, cons_rounds)
+    deepca = DeEPCA(consensus)
     deepca_loss_hist = []
     deepca_gen = deepca.algo_iters(U_arr)
     # DPMFD
-    dpmfd = DPMFD(comm_W, cons_rounds)
+    dpmfd = DPMFD(consensus)
     dpmfd_loss_hist = []
     dpmfd_gen = dpmfd.algo_iters(U_arr)
-    # DRGrAv
-    drgrav = DRGrAv(comm_W, cons_rounds)
-    drgrav_loss_hist = []
-    drgrav_gen = drgrav.algo_iters(U_arr)
+    # FiniteDRGrAv
+    fdrgrav = FiniteDRGrAv(alpha, num_iter, consensus)
+    fdrgrav_loss_hist = []
+    fdrgrav_gen = fdrgrav.algo_iters(U_arr)
+    # AsymptoticDRGrAv
+    adrgrav = AsymptoticDRGrAv(alpha, consensus)
+    adrgrav_loss_hist = []
+    adrgrav_gen = adrgrav.algo_iters(U_arr)
 
-    for _ in range(64):
+    for _ in range(num_iter+1):
         plt.gca().clear()
 
         # ============================ Centralized ============================
-        # EPCA
-        epca_iter_frame = next(epca_gen)
-        epca_loss_hist.append(
-            util.grassmannian_dist(epca_iter_frame.U, U_the)**2
+        # BPM
+        bpm_iter_frame = next(bpm_gen)
+        bpm_loss_hist.append(
+            util.grassmannian_dist(bpm_iter_frame.U, U_the)**2
         )
-        plt.semilogy(epca_loss_hist, '-x', label='epca')
+        plt.semilogy(bpm_loss_hist, '-x', label='bpm')
         # FMGD
         fmgd_iter_frame = next(fmgd_gen)
         fmgd_loss_hist.append(
@@ -90,12 +107,18 @@ def main():
             util.grassmannian_dist(pmfd_iter_frame.U, U_the)**2
         )
         plt.semilogy(pmfd_loss_hist, '-x', label='pmfd')
-        # RGrAv
-        rgrav_iter_frame = next(rgrav_gen)
-        rgrav_loss_hist.append(
-            util.grassmannian_dist(rgrav_iter_frame.U, U_the)**2
+        # FiniteRGrAv
+        frgrav_iter_frame = next(frgrav_gen)
+        frgrav_loss_hist.append(
+            util.grassmannian_dist(frgrav_iter_frame.U, U_the)**2
         )
-        plt.semilogy(rgrav_loss_hist, '-x', label='rgrav')
+        plt.semilogy(frgrav_loss_hist, '-x', label='frgrav')
+        # AsymptoticRGrAv
+        argrav_iter_frame = next(argrav_gen)
+        argrav_loss_hist.append(
+            util.grassmannian_dist(argrav_iter_frame.U, U_the)**2
+        )
+        plt.semilogy(argrav_loss_hist, '-x', label='argrav')
         # =========================== Decentralized ===========================
         # DBPM
         dbpm_iter_frame = next(dbpm_gen)
@@ -115,12 +138,18 @@ def main():
             (util.grassmannian_dist(dpmfd_iter_frame.U, U_the)**2).mean(0)
         )
         plt.semilogy(dpmfd_loss_hist, '-x', label='dpmfd')
-        # DRGrAv
-        drgrav_iter_frame = next(drgrav_gen)
-        drgrav_loss_hist.append(
-            (util.grassmannian_dist(drgrav_iter_frame.U, U_the)**2).mean(0)
+        # FiniteDRGrAv
+        fdrgrav_iter_frame = next(fdrgrav_gen)
+        fdrgrav_loss_hist.append(
+            (util.grassmannian_dist(fdrgrav_iter_frame.U, U_the)**2).mean(0)
         )
-        plt.semilogy(drgrav_loss_hist, '-x', label='drgrav')
+        plt.semilogy(fdrgrav_loss_hist, '-x', label='fdrgrav')
+        # AsymptoticDRGrAv
+        adrgrav_iter_frame = next(adrgrav_gen)
+        adrgrav_loss_hist.append(
+            (util.grassmannian_dist(adrgrav_iter_frame.U, U_the)**2).mean(0)
+        )
+        plt.semilogy(adrgrav_loss_hist, '-x', label='adrgrav')
 
         plt.legend()
         plt.pause(0.01)

@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from . import util
+
 
 def get_constant_period_scheduler(period, offset=0):
     """
@@ -57,6 +59,17 @@ class GrassmannianAveragingAlgorithm(ABC):
     The base class for a Grassmannian averaging algorithm
     """
 
+    def __init__(self):
+        self.U0 = None
+
+    def set_U0(self, U0):
+        self.U0 = U0
+
+    def get_U0(self, U_arr):
+        if self.U0 is None:
+            self.U0 = util.get_standard_basis_like(U_arr[0])
+        return self.U0
+
     def average(self, U_arr, max_iter=64, tol=None):
         """
         Averages the subspaces in U_arr
@@ -77,7 +90,7 @@ class GrassmannianAveragingAlgorithm(ABC):
             decentralized algorithms
         """
         gen = self.algo_iters(U_arr)
-        for i in range(max_iter):
+        for i in range(max_iter+1):
             iter_frame = next(gen)
             if tol is not None:
                 if not hasattr(iter_frame, 'err_criterion'):
@@ -116,38 +129,18 @@ class DecentralizedConsensusAlgorithm(GrassmannianAveragingAlgorithm):
     The base class for a decentralized Grassmannian averaging algorithm
     """
 
-    def __init__(self, comm_W, cons_rounds):
+    def __init__(self, consensus):
         """
         Parameters
         ----------
-        comm_W : tensor[M, M]
-            Consensus communication matrix such that comm_W @ 1 = 1 and
-            |lambda2(comm_W)| < 1
-        cons_rounds : int
-            The number of rounds for consensus
+        consensus : ConsensusMethod
+            The method by which consensus will be performed
         """
-        self.comm_W = comm_W
-        self.cons_rounds = cons_rounds
+        super().__init__()
+        self.consensus = consensus
 
-    def _consensus(self, X):
-        """
-        Computes average consensus
-
-        Parameters
-        ----------
-        X : tensor[M, ...]
-            Tensor to be averaged over the first dim
-
-        Returns
-        -------
-        X_cons : tensor[M, ...]
-            The consensus averaged tensors
-        """
-        shape_X = X.shape
-        X_ = X.view(shape_X[0], -1)
-        for _ in range(self.cons_rounds):
-            X_ = self.comm_W @ X_
-        X_cons = X_.view(shape_X)
-        return X_cons
-
+    def get_U0(self, U_arr):
+        if self.U0 is None:
+            self.U0 = util.get_standard_basis_like(U_arr)
+        return self.U0
 

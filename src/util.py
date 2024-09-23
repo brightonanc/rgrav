@@ -1,5 +1,6 @@
 import torch
 from scipy.stats import ortho_group
+import warnings
 
 
 def get_standard_basis(N, K, dtype=None, dev=None):
@@ -29,7 +30,7 @@ def get_standard_basis_like(X):
     rv = rv.expand(X.shape)
     return rv
 
-def get_orthobasis(X, mode='qr-stable'):
+def get_orthobasis(X, mode='qr-stable', others_X=None, return_S=False):
     """
     Returns an orthobasis corresponding to the column space of a given matrix
 
@@ -39,27 +40,99 @@ def get_orthobasis(X, mode='qr-stable'):
         The matrix whose columns are used to compute the orthobasis
     mode : str
         The mode by which the orthobasis is computed
+    others : iterable[tensor[..., N_o, K]]
+        A collection of tensors which should be modified by the same right-side
+        linear transformations as X is. N_o may be different for each tensor in
+        others
+    return_S : bool
+        If True, this function will also return the matrix S as the last value.
+        S is such that U = X @ S.
 
     Returns
     -------
     U : tensor[..., N, K]
         A representative orthobasis
+    others_U : iterable[tensor[..., N_o, K]]
+        A collection of tensors modified by the same right-side linear
+        transformations as X was
     """
     assert X.shape[-2] >= X.shape[-1]
+    K = X.shape[-1]
     match mode:
         case 'qr':
-            return torch.linalg.qr(X).Q
-        case 'svd':
-            U_, _, Vh_ = torch.linalg.svd(X, full_matrices=False)
-            return U_ @ Vh_
+            U, R = torch.linalg.qr(X)
+            d_R = R[..., range(K), range(K)]
+            if d_R.abs().min() < torch.finfo(d_R.dtype).resolution:
+                warnings.warn(
+                    f'util.get_orthobasis: {mode=} applied on a degenerate'
+                    ' matrix'
+                )
+            if others_X:
+                others_U = [
+                    torch.linalg.solve_triangular(
+                        R,
+                        other_X,
+                        upper=True,
+                        left=False,
+                    ) for other_X in others_X
+                ]
+            if return_S:
+                I = torch.eye(K)
+                S = torch.linalg.solve_triangular(R, I, upper=True, left=False)
         case 'qr-stable':
             Q, R = torch.linalg.qr(X)
-            K = R.shape[-1]
-            return Q * R[..., None, range(K), range(K)].sign()
+            sd_R = R[..., range(K), range(K)]
+            if sd_R.abs().min() < torch.finfo(sd_R.dtype).resolution:
+                warnings.warn(
+                    f'util.get_orthobasis: {mode=} applied on a degenerate'
+                    ' matrix'
+                )
+            sd_R = sd_R.sign()
+            U = Q * sd_R[..., None, :]
+            if others_X or return_S:
+                R *= sd_R[..., :, None]
+                if others_X:
+                    others_U = [
+                        torch.linalg.solve_triangular(
+                            R,
+                            other_X,
+                            upper=True,
+                            left=False,
+                        ) for other_X in others_X
+                    ]
+                if return_S:
+                    I = torch.eye(K)
+                    S = torch.linalg.solve_triangular(
+                        R,
+                        I,
+                        upper=True,
+                        left=False
+                    )
+        case 'svd':
+            U_, s_, Vh_ = torch.linalg.svd(X, full_matrices=False)
+            if s_.min() < torch.finfo(s_.dtype).resolution:
+                warnings.warn(
+                    f'util.get_orthobasis: {mode=} applied on a degenerate'
+                    ' matrix'
+                )
+            U = U_ @ Vh_
+            if others_X or return_S:
+                S = Vh_.mT @ ((1. / s_)[..., None] * Vh_)
+                if others_X:
+                    others_U = [other_X @ S for other_X in others_X]
         case _:
             raise ValueError(f'{mode=} not recognized')
+    rv_arr = [U]
+    if others_X is not None:
+        rv_arr.append(others_U)
+    if return_S:
+        rv_arr.append(S)
+    if 1 == len(rv_arr):
+        return rv_arr[0]
+    else:
+        return tuple(rv_arr)
 
-def grassmannian_dist(U1, U2):
+def grassmannian_dist(U1, U2, assume_ortho=False):
     """
     Computes the Grassmannian geodesic distance between two orthobases
 
@@ -67,11 +140,17 @@ def grassmannian_dist(U1, U2):
     ----------
     U1 : tensor[..., N, K]
     U2 : tensor[..., N, K]
+    assume_ortho : bool
+        If True, U1 and U2 are used to already be orthobases and
+        orthonormalization is skipped
 
     Returns
     -------
     dist : tensor[...]
     """
+    if not assume_ortho:
+        U1 = get_orthobasis(U1)
+        U2 = get_orthobasis(U2)
     c = torch.linalg.svdvals(U2.mT @ U1)
     c[1. < c] = 1.
     theta = torch.acos(c)

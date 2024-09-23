@@ -21,6 +21,25 @@ def test_get_orthobasis(mode):
     U = util.get_orthobasis(X, mode=mode)
     X_ = U @ (U.mT @ X)
     assert 1e-5 > (X - X_).abs().max()
+    others_X = [
+        torch.randn(M, N, K),
+        torch.randn(M, 13, K),
+        torch.randn(M, K, K),
+        torch.randn(M, 1, K),
+        torch.randn(N, K),
+        torch.randn(13, K),
+        torch.randn(K, K),
+        torch.randn(1, K),
+    ]
+    U, others_U = util.get_orthobasis(X, mode=mode, others_X=others_X)
+    S_inv = U.mT @ X
+    X_ = U @ S_inv
+    assert 1e-5 > (X - X_).abs().max()
+    others_X_ = [other_U @ S_inv for other_U in others_U]
+    assert all(
+        1e-5 > (other_X - other_X_).abs().max()
+        for other_X, other_X_ in zip(others_X, others_X_)
+    )
 
 @pytest.fixture(params=[
     (2, 1),
