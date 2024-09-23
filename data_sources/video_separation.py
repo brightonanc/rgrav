@@ -47,18 +47,20 @@ class SUMMET_Loader():
         mat_loc = os.path.join(this_dir, 'Summet_Data/DARPA_tracklets_2345_09_05.mat')
         assert os.path.exists(mat_loc), 'summet dataset not found'
         with h5py.File(mat_loc, 'r') as f:
-            print(f.keys())
-            print(f['#refs#'])
-            refs = list(f['#refs#'])
-            tracklets = list(f['tracklets'])
-            tracklets = [np.array(t) for t in tracklets]
-            raise NotImplementedError
+            tracklet_refs = [f['tracklets'][0, i] for i in range(len(f['tracklets'][0]))]
+            self.tracklets = [np.array(f[ref]['data']) for ref in tracklet_refs]
+        self.tracklets = np.array(self.tracklets)
+        print('tracklets shape: ', self.tracklets.shape)
 
     def load_data(self, frame_idx):
-        pass
+        assert 0 <= frame_idx < len(self.tracklets), 'frame index out of range'
+        return self.tracklets[frame_idx]
 
 
 if __name__ == '__main__':
+    summet_loader = SUMMET_Loader()
+    print(summet_loader.tracklets[0].shape)
+    exit()
     loader = Loader_CDW('highway')
     print('n_samples: ', loader.n_samples)
     print('data: ', loader.fnames[:3])
