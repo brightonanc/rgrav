@@ -8,6 +8,7 @@
 
 import os
 import glob
+import torch
 import numpy as np
 import scipy.io
 import cv2
@@ -51,6 +52,7 @@ class SUMMET_Loader():
         labels = action_labels[2]
         # just take the first label for each tracklet
         self.labels = labels[:, 0]
+        self.labels = [label[0] for label in self.labels]
 
         mat_loc = os.path.join(this_dir, 'Summet_Data/DARPA_tracklets_2345_09_05.mat')
         assert os.path.exists(mat_loc), 'summet dataset not found'
@@ -58,6 +60,7 @@ class SUMMET_Loader():
             tracklet_refs = [f['tracklets'][0, i] for i in range(len(f['tracklets'][0]))]
             self.tracklets = [np.array(f[ref]['data']) for ref in tracklet_refs]
         self.tracklets = np.array(self.tracklets)
+        self.tracklets = torch.from_numpy(self.tracklets)
         print('tracklets shape: ', self.tracklets.shape)
 
     def load_data(self, frame_idx):

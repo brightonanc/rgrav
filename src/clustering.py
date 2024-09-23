@@ -10,6 +10,11 @@ class SubspaceClustering:
         self.n_iters = 100
         self.center_tol = 1e-1
 
+    def assign_clusters(self, points, centers):
+        dists = torch.stack([torch.stack([grassmannian_dist(point, center) for center in centers]) for point in points])
+        cluster_assignments = torch.argmin(dists, dim=1)
+        return cluster_assignments
+
     def cluster(self, points, n_centers):
         # clustering pseudocode:
         # 1. initialize centers randomly
@@ -33,8 +38,7 @@ class SubspaceClustering:
                         U_centers[i] = points[ind]
 
             # do cluster assignment
-            dists = torch.stack([torch.stack([grassmannian_dist(point, center) for center in U_centers]) for point in points])
-            cluster_assignments = torch.argmin(dists, dim=1)
+            cluster_assignments = self.assign_clusters(points, U_centers)
 
             # update centers
             center_changes = []
