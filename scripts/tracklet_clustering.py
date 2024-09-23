@@ -30,8 +30,7 @@ print('tracklets: ', tracklets.shape)
 print('flat: ', tracklets_flat.shape)
 print('labels: ', len(labels))
 
-K = 12
-K = 4
+K = 24
 n_subs = tracklets.shape[1] // K
 assert n_subs * K == tracklets.shape[1]
 n_tracklets = tracklets.shape[0]
