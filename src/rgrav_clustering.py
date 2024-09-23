@@ -8,7 +8,7 @@ class SubspaceClustering:
     def __init__(self, ave_algo):
         self.ave_algo = ave_algo
         self.n_iters = 100
-        self.center_tol = 1e-2
+        self.center_tol = 1e-1
 
     def cluster(self, points, n_centers):
         # clustering pseudocode:
@@ -57,31 +57,14 @@ class SubspaceClustering:
 
         return U_centers
 
-
-if __name__ == "__main__":
-    N = 100; K = 10
-    # N = 10; K = 3
-    n_points = 100
-    n_centers = 10
-    center_dist = 0.5
-    center_radius = 0.1
-    center_dist = 1.0
-    center_radius = 0.01
-
-    # generate synthetic data
+def generate_cluster_data(N, K, n_centers, n_points, center_dist, center_radius):
     U_center = random_grassmannian_point(N, K)
+
     U_centers = []
     for _ in range(n_centers):
         H = random_grassmannian_tangent(U_center)
         H *= center_dist
         U_centers.append(grassmannian_exp(U_center, H))
-
-    pairwise_dists = []
-    for i in range(n_centers):
-        for j in range(i+1, n_centers):
-            pairwise_dists.append(grassmannian_dist(U_centers[i], U_centers[j]))
-
-    print(pairwise_dists)
 
     points = []
     for i in range(n_centers):
@@ -93,7 +76,17 @@ if __name__ == "__main__":
             points.append(point)
 
     points = torch.stack(points, dim=0)
-    print('points shape', points.shape)
+    return points, U_centers
+
+
+if __name__ == "__main__":
+    N = 100; K = 10
+    # N = 10; K = 3
+    n_points = 100
+    n_centers = 10
+    center_dist = 1.0
+    center_radius = 0.1
+    points, U_centers = generate_cluster_data(N, K, n_centers, n_points, center_dist, center_radius)
 
     # do clustering
     rgrav_clustering = SubspaceClustering(RGrAv())
