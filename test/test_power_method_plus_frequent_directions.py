@@ -1,7 +1,7 @@
 import torch
 
 from src.power_method_plus_frequent_directions import PMFD, DPMFD
-from src import util, HypercubeGraph
+from src import util, HypercubeGraph, SimpleConsensus
 
 
 def test_PMFD(U_arr):

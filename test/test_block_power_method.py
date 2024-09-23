@@ -15,7 +15,8 @@ def test_DBPM(U_arr):
         HypercubeGraph.get_optimal_lapl_based_comm_W(
             int(torch.log2(torch.tensor(U_arr.shape[0])).item()),
             dtype=torch.float64
-        )
+        ),
+        cons_rounds=32,
     )
     U_emp = DBPM(consensus).average(U_arr, max_iter=64)
     P_avg = (U_arr @ U_arr.mT).mean(0)

@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
+import torch
 
 from .chebyshev import ChebyshevMagicNumbers
 from . import util
 
 
-class ConsensusMethod(ABC)
+class ConsensusMethod(ABC):
     """
     The base class for a decentralized average consensus method
     """
@@ -29,7 +30,7 @@ class SimpleConsensus(ConsensusMethod):
     """
     Implements simple memory-less linear average consensus
     """
-    def __init__(self, comm_W, cons_rounds):
+    def __init__(self, comm_W, cons_rounds=8):
         """
         Parameters
         ----------
@@ -54,7 +55,7 @@ class FastMixDeEPCA(ConsensusMethod):
     """
     Implements the FastMix algorithm as described in the DeEPCA paper
     """
-    def __init__(self, comm_W, cons_rounds, lambda2=None):
+    def __init__(self, comm_W, cons_rounds=8, lambda2=None):
         """
         Parameters
         ----------
@@ -75,7 +76,7 @@ class FastMixDeEPCA(ConsensusMethod):
         tmp = (1 - (lambda2**2))**0.5
         eta = (1 - tmp) / (1 + tmp)
         self._eta = eta
-    def __call__(self, W):
+    def __call__(self, X):
         shape_X = X.shape
         X_ = X.reshape(shape_X[0], -1)
         prev_X_ = X_
@@ -84,7 +85,7 @@ class FastMixDeEPCA(ConsensusMethod):
                     - (self._eta * prev_X_)
             prev_X_ = X_
             X_ = next_X_
-        X = X_.view(M, N, K)
+        X = X_.view(shape_X)
         return X
 
 class ChebyshevConsensus(ConsensusMethod):
@@ -92,7 +93,7 @@ class ChebyshevConsensus(ConsensusMethod):
     Implements an accelerated consensus procedure using Chebyshev polynomial
     approximations
     """
-    def __init__(self, comm_W, cons_rounds, lambda2=None):
+    def __init__(self, comm_W, cons_rounds=8, lambda2=None):
         """
         Parameters
         ----------
@@ -111,7 +112,7 @@ class ChebyshevConsensus(ConsensusMethod):
         if lambda2 is None:
             lambda2 = torch.linalg.eigvalsh(self.comm_W)[-2].item()
         self.cmn = ChebyshevMagicNumbers(lambda2)
-    def __call__(self, W):
+    def __call__(self, X):
         shape_X = X.shape
         X_ = X.reshape(shape_X[0], -1)
         for it in range(1, self.cons_rounds+1):
@@ -124,6 +125,6 @@ class ChebyshevConsensus(ConsensusMethod):
                 next_X_ = a * ((self.comm_W @ X_) + (b * X_) + (c * prev_X_))
             prev_X_ = X_
             X_ = next_X_
-        X = X_.view(M, N, K)
+        X = X_.view(shape_X)
         return X
 

@@ -9,7 +9,7 @@ from . import util
 class BPM(GrassmannianAveragingAlgorithm):
     """ A simple Block Power Method """
 
-    def __init__(self, mode='qr', ortho_scheduler=None):
+    def __init__(self, mode='qr-stable', ortho_scheduler=None):
         super().__init__()
         self.mode = mode
         if ortho_scheduler is None:
@@ -40,7 +40,7 @@ class BPM(GrassmannianAveragingAlgorithm):
 class DBPM(DecentralizedConsensusAlgorithm):
     """ A simple Decentralized Block Power Method """
 
-    def __init__(self, consensus, mode='qr', ortho_scheduler=None):
+    def __init__(self, consensus, mode='qr-stable', ortho_scheduler=None):
         super().__init__(consensus)
         self.mode = mode
         if ortho_scheduler is None:
