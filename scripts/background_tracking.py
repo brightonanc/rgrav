@@ -20,6 +20,7 @@ if __name__ == '__main__':
     im_shape = X.shape[1:]
     n_dims = torch.prod(torch.tensor(im_shape))
     X = X.reshape(n_samples, n_dims).T
+    imgs_mean = X.mean(dim=1)
     print('data flattened: ', X.shape)
 
     K = 10
@@ -58,7 +59,7 @@ if __name__ == '__main__':
             plt.subplot(331 + m * 3 + d)
             plt.imshow(im)
 
-    rgrav = AsymptoticRGrAv()
+    rgrav = AsymptoticRGrAv(0.5)
     U_iters = []
     for iter_frame in tqdm(rgrav.algo_iters(U_arr)):
         U_est = iter_frame.U
@@ -86,5 +87,25 @@ if __name__ == '__main__':
         final_im = (final_im - final_im.min()) / (final_im.max() - final_im.min())
         plt.figure()
         plt.imshow(final_im)
+
+    if not os.path.exists('plots'):
+        os.makedirs('plots')
+
+    # do background subtraction and plot video
+    for i in range(n_samples):
+        img = loader.load_data(i)
+        img_flat = img.view(n_dims)
+        img_flat = img_flat - imgs_mean
+        img_fore = img_flat - final_U @ (final_U.T @ img_flat)
+        img_fore = img_fore + imgs_mean
+        img_fore = torch.clip(img_fore, 0, 1)
+        img_fore = img_fore.view(im_shape)
+        plt.figure()
+        plt.imshow(img_fore)
+        plt.savefig('plots/background_subtraction_{}.png'.format(i))
+
+    from gif import gif_folder
+    gif_folder('plots', 'background_subtraction_')
+
     plt.show()
 
