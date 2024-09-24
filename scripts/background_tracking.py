@@ -8,13 +8,22 @@ from src import *
 from src.util import *
 
 if __name__ == '__main__':
-    loader = Loader_CDW('canoe')
+    dataset = 'canoe'
+    # dataset = 'highway'
+    loader = Loader_CDW(dataset)
     X = []
     for i in range(loader.n_samples):
         img = loader.load_data(i)
         X.append(img)
     X = torch.stack(X, dim=0)
     print('data shape: ', X.shape)
+
+    if dataset == 'canoe':
+        X = X[800:]
+        print('data shape: ', X.shape)
+    elif dataset == 'highway':
+        X = X[1300:]
+        print('data shape: ', X.shape)
 
     n_samples = X.shape[0]
     im_shape = X.shape[1:]
@@ -23,7 +32,7 @@ if __name__ == '__main__':
     imgs_mean = X.mean(dim=1)
     print('data flattened: ', X.shape)
 
-    K = 10
+    K = 5
     n_split = n_samples // K
     n_samples = n_split * K
     X = X[:, :n_samples]
@@ -93,18 +102,33 @@ if __name__ == '__main__':
 
     # do background subtraction and plot video
     for i in range(n_samples):
-        img = loader.load_data(i)
-        img_flat = img.view(n_dims)
-        img_flat = img_flat - imgs_mean
-        img_fore = img_flat - final_U @ (final_U.T @ img_flat)
-        img_fore = img_fore + imgs_mean
+        img_flat = X[:, i]
+        img = img_flat.view(im_shape)
+        # img_flat = img_flat - imgs_mean
+        img_back = final_U @ (final_U.T @ img_flat)
+        img_fore = img_flat - img_back
+        # img_fore = img_fore + imgs_mean
+        
+        img_back = (img_back - img_back.min()) / (img_back.max() - img_back.min())
+        img_back = torch.clip(img_back, 0, 1)
+        img_back = img_back.view(im_shape)
+
+        img_fore = (img_fore - img_fore.min()) / (img_fore.max() - img_fore.min())
         img_fore = torch.clip(img_fore, 0, 1)
         img_fore = img_fore.view(im_shape)
-        plt.figure()
-        plt.imshow(img_fore)
-        plt.savefig('plots/background_subtraction_{}.png'.format(i))
 
-    from gif import gif_folder
+        plt.figure(figsize=(12, 4))
+        plt.subplot(131)
+        plt.imshow(img)
+        plt.subplot(132)
+        plt.imshow(img_back)
+        plt.subplot(133)
+        plt.imshow(img_fore)
+
+        plt.savefig('plots/background_subtraction_{}.png'.format(i))
+        plt.close()
+
+    from src.gif import gif_folder
     gif_folder('plots', 'background_subtraction_')
 
     plt.show()

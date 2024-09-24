@@ -2,7 +2,7 @@ import os
 import imageio
 
 
-def gif_folder(folder, prefix, fps=10):
+def gif_folder(folder, prefix, fps=20):
     m = 0
     images = []
     while True:
