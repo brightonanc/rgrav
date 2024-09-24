@@ -70,12 +70,15 @@ class SUMMET_Loader():
 
 if __name__ == '__main__':
     summet_loader = SUMMET_Loader()
-    track = summet_loader.load_data(1)
+    ind = 1000
+    track = summet_loader.load_data(ind)
+    label = summet_loader.labels[ind]
     print(track.shape)
     import matplotlib.pyplot as plt
     plt.figure()
+    plt.suptitle(f'tracklet {label}')
     for i in range(len(track)):
-        plt.imshow(track[i])
+        plt.imshow(track[i].T, cmap='gray')
         plt.pause(0.2)
     exit()
     loader = Loader_CDW('highway')
