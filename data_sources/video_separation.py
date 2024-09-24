@@ -24,24 +24,28 @@ class Loader_CDW():
         self.data_dir = os.path.join(base_dir, 'input')
         self.gt_dir = os.path.join(base_dir, 'groundtruth')
         assert os.path.exists(self.data_dir) and os.path.exists(self.gt_dir), \
-            'highway dataset not found'
+            '{} dataset not found'.format(base_dir)
 
         self.fnames = sorted(glob.glob(os.path.join(self.data_dir, '*.jpg')))
         self.fnames_gt = sorted(glob.glob(os.path.join(self.gt_dir, '*.png')))
         assert len(self.fnames) == len(self.fnames_gt), \
-            'highway dataset has different number of frames and groundtruths'
+            '{} dataset has different number of frames and groundtruths'.format(base_dir)
         self.n_samples = len(self.fnames)
 
     def load_data(self, frame_idx):
         assert 0 <= frame_idx < self.n_samples, 'frame index out of range'
         img = cv2.imread(self.fnames[frame_idx])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = torch.from_numpy(img)
+        img = img / 255.0
         return img
 
     def load_gt(self, frame_idx):
         assert 0 <= frame_idx < self.n_samples, 'frame index out of range'
         img = cv2.imread(self.fnames_gt[frame_idx])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = torch.from_numpy(img)
+        img = img / 255.0
         return img
 
 class SUMMET_Loader():

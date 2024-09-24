@@ -8,28 +8,45 @@ from src import *
 from src.util import *
 
 if __name__ == '__main__':
-    loader = Loader_CDW('highway')
+    loader = Loader_CDW('canoe')
     X = []
     for i in range(loader.n_samples):
-        X.append(loader.load_data(i))
-    X = np.stack(X, axis=0)
+        img = loader.load_data(i)
+        X.append(img)
+    X = torch.stack(X, dim=0)
     print('data shape: ', X.shape)
 
     n_samples = X.shape[0]
     im_shape = X.shape[1:]
-    n_dims = np.prod(im_shape)
+    n_dims = torch.prod(torch.tensor(im_shape))
     X = X.reshape(n_samples, n_dims).T
     print('data flattened: ', X.shape)
 
-    X_batches = np.split(X, 100, axis=1)
-    # X_batches = X_batches[:10]
-    print(X_batches[0].shape)
+    K = 10
+    n_split = n_samples // K
+    n_samples = n_split * K
+    X = X[:, :n_samples]
+    X_batches = torch.split(X, n_split, dim=1)
+    print('single batch shape: ',X_batches[0].shape)
 
     U_arr = []
     for i in tqdm(range(len(X_batches))):
         X_batch = X_batches[i]
-        U, S, Vt = np.linalg.svd(X_batch, full_matrices=False)
+        U, S, Vt = torch.linalg.svd(X_batch, full_matrices=False)
         U_arr.append(U)
+    U_arr = torch.stack(U_arr, dim=0)
+
+    # compute average projector
+    # jk it's too large of a matrix
+    # P = 0.
+    # for U in U_arr:
+    #     U = U[::10]
+    #     P += U @ U.T
+    # P /= len(U_arr)
+    # P_eigs = torch.linalg.eigvalsh(P)
+    # plt.figure()
+    # plt.plot(P_eigs)
+    # plt.show()
 
     # visualize first few Us
     plt.figure()
@@ -41,9 +58,7 @@ if __name__ == '__main__':
             plt.subplot(331 + m * 3 + d)
             plt.imshow(im)
 
-    U_arr = torch.tensor(U_arr)
-
-    rgrav = RGrAv()
+    rgrav = AsymptoticRGrAv()
     U_iters = []
     for iter_frame in tqdm(rgrav.algo_iters(U_arr)):
         U_est = iter_frame.U
