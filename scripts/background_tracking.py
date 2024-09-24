@@ -106,11 +106,8 @@ if __name__ == '__main__':
     for i in range(n_samples):
         img_flat = X[:, i]
         img = img_flat.view(im_shape)
-        img_flat = img_flat - imgs_mean
-        img_back = final_U @ (final_U.T @ img_flat)
-        img_back = img_back + imgs_mean
-        # img_fore = img_flat - img_back
-        img_fore = img_back - img_flat
+        img_back = final_U @ (final_U.T @ (img_flat - imgs_mean)) + imgs_mean
+        img_fore = img_flat - img_back
         
         img_back = img_back.view(im_shape)
         img_fore = img_fore.view(im_shape)
@@ -127,8 +124,8 @@ if __name__ == '__main__':
     # trim = 0.2
     # img_fores = (img_fores - 0.5 - trim) / 2 * trim
     # img_backs = (img_backs - 0.5 - trim) / 2 * trim
-    # img_fores = torch.clip(img_fores, 0, 1)
-    # img_backs = torch.clip(img_backs, 0, 1)
+    img_fores = torch.clip(img_fores, 0, 1)
+    img_backs = torch.clip(img_backs, 0, 1)
     plt.figure()
     plt.subplot(121)
     plt.hist(img_fores.flatten()[:10000])
