@@ -9,7 +9,7 @@ from src.util import *
 
 if __name__ == '__main__':
     dataset = 'canoe'
-    # dataset = 'highway'
+    dataset = 'highway'
     loader = Loader_CDW(dataset)
     X = []
     for i in range(loader.n_samples):
@@ -119,11 +119,7 @@ if __name__ == '__main__':
     img_backs = torch.stack(img_backs, dim=0)
     print('img fores', img_fores.min(), img_fores.max(), img_fores.mean(), img_fores.std())
     print('img backs', img_backs.min(), img_backs.max(), img_backs.mean(), img_backs.std())
-    # img_fores = (img_fores - img_fores.min()) / (img_fores.max() - img_fores.min())
-    # img_backs = (img_backs - img_backs.min()) / (img_backs.max() - img_backs.min())
-    # trim = 0.2
-    # img_fores = (img_fores - 0.5 - trim) / 2 * trim
-    # img_backs = (img_backs - 0.5 - trim) / 2 * trim
+    img_fores += 0.2
     img_fores = torch.clip(img_fores, 0, 1)
     img_backs = torch.clip(img_backs, 0, 1)
     plt.figure()
