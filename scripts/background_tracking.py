@@ -32,7 +32,7 @@ if __name__ == '__main__':
     imgs_mean = X.mean(dim=1)
     print('data flattened: ', X.shape)
 
-    K = 5
+    K = 10
     n_split = n_samples // K
     n_samples = n_split * K
     X = X[:, :n_samples]
@@ -101,22 +101,45 @@ if __name__ == '__main__':
         os.makedirs('plots')
 
     # do background subtraction and plot video
+    img_backs = []
+    img_fores = []
     for i in range(n_samples):
         img_flat = X[:, i]
         img = img_flat.view(im_shape)
-        # img_flat = img_flat - imgs_mean
+        img_flat = img_flat - imgs_mean
         img_back = final_U @ (final_U.T @ img_flat)
-        img_fore = img_flat - img_back
-        # img_fore = img_fore + imgs_mean
+        img_back = img_back + imgs_mean
+        # img_fore = img_flat - img_back
+        img_fore = img_back - img_flat
         
-        img_back = (img_back - img_back.min()) / (img_back.max() - img_back.min())
-        img_back = torch.clip(img_back, 0, 1)
         img_back = img_back.view(im_shape)
-
-        img_fore = (img_fore - img_fore.min()) / (img_fore.max() - img_fore.min())
-        img_fore = torch.clip(img_fore, 0, 1)
         img_fore = img_fore.view(im_shape)
+        img_backs.append(img_back)
+        img_fores.append(img_fore)
 
+    # normalize all images from foreground and background
+    img_fores = torch.stack(img_fores, dim=0)
+    img_backs = torch.stack(img_backs, dim=0)
+    print('img fores', img_fores.min(), img_fores.max(), img_fores.mean(), img_fores.std())
+    print('img backs', img_backs.min(), img_backs.max(), img_backs.mean(), img_backs.std())
+    # img_fores = (img_fores - img_fores.min()) / (img_fores.max() - img_fores.min())
+    # img_backs = (img_backs - img_backs.min()) / (img_backs.max() - img_backs.min())
+    # trim = 0.2
+    # img_fores = (img_fores - 0.5 - trim) / 2 * trim
+    # img_backs = (img_backs - 0.5 - trim) / 2 * trim
+    # img_fores = torch.clip(img_fores, 0, 1)
+    # img_backs = torch.clip(img_backs, 0, 1)
+    plt.figure()
+    plt.subplot(121)
+    plt.hist(img_fores.flatten()[:10000])
+    plt.subplot(122)
+    plt.hist(img_backs.flatten()[:10000])
+    # plt.show()
+
+    for i in range(n_samples):
+        img = X[:, i].view(im_shape)
+        img_back = img_backs[i]
+        img_fore = img_fores[i]
         plt.figure(figsize=(12, 4))
         plt.subplot(131)
         plt.imshow(img)
