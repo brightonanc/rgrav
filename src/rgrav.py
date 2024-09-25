@@ -41,10 +41,8 @@ class FiniteRGrAv(GrassmannianAveragingAlgorithm):
             root = self.root_arr[it-1] if within_num_iter else 0.
             fac0 = 1 / (1 - root)
             fac1 = root / (1 - root)
-            term0 = fac0 * (U_arr @ (U_arr.mT @ U))
-            term1 = fac1 * U
-            Z = term0 - term1
-            Z_hat = Z.mean(0)
+            A = U_arr @ (U_arr.mT @ U)
+            Z_hat = (fac0 * A.mean(0)) - (fac1 * U)
             do_ortho = self.ortho_scheduler(it)
             if do_ortho:
                 U = util.get_orthobasis(Z_hat, mode=self.mode)
@@ -75,14 +73,14 @@ class AsymptoticRGrAv(GrassmannianAveragingAlgorithm):
         while True:
             it += 1
             iter_frame = SimpleNamespace()
+            A = U_arr @ (U_arr.mT @ U)
             if 1 == it:
-                Z = U_arr @ (U_arr.mT @ U)
+                Z_hat = A.mean(0)
             else:
                 a = self.cmn.a(it)
                 b = self.cmn.b(it)
                 c = self.cmn.c(it)
-                Z = a * ((U_arr @ (U_arr.mT @ U)) + (b * U) + (c * prev_U))
-            Z_hat = Z.mean(0)
+                Z_hat = a * (A.mean(0) + (b * U) + (c * prev_U))
             do_ortho = self.ortho_scheduler(it)
             prev_U = U
             if do_ortho:
