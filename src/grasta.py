@@ -14,9 +14,13 @@ class GRASTA:
         self.U = orth(np.random.randn(n, d))
         
         # Adaptive step size parameters
+        self.C = 10
         self.eta = 0.1
-        self.mu = 3
+        self.mu0 = 3
+        self.mu = self.mu0
         self.level = 0
+        self.step_parameters = [1, -1, 15, 1]
+        self.omega = 0.1
         
         # Previous gradient for adaptive step size
         self.prev_gradient = None
@@ -65,20 +69,31 @@ class GRASTA:
         gamma -= self.U @ gamma2
         return gamma, w
 
+    def sigmoid(self, x, fmin, fmax, omega):
+        if x == 0:
+            return 0
+        sigval = fmin + (fmax - fmin) / (1 - (fmax / fmin) * np.exp(-x / omega))
+        return sigval
+
     def _update_step_size(self, gamma, w):
         gradient = gamma @ w.T
         if self.prev_gradient is not None:
-            inner_product = np.sum(self.prev_gradient * gradient)
-            self.mu = max(self.mu + np.tanh(-inner_product), 1)
+            inner_product = np.trace(self.prev_gradient.T @ gradient)
+            prev_mu = self.mu
+            prev_level = self.level
+            fmax, fmin, mumax, mumin = self.step_parameters
+            omega = self.omega
+            self.mu = max(prev_mu + self.sigmoid(-inner_product, fmin, fmax, omega), mumin)
             
-            if self.mu > 15:
+            if self.mu >= mumax:
                 self.level += 1
-                self.mu = 3
-            elif self.mu < 1:
-                self.level = max(0, self.level - 1)
-                self.mu = 3
+                self.mu = self.mu0
+            elif self.mu <= mumin:
+                self.level += 1
+                print('level', self.level)
+                self.mu = self.mu0
         
-        self.eta = 0.1 * (2 ** -self.level) / (1 + self.mu)
+        self.eta = self.C * (2 ** -self.level) / (1 + self.mu)
         self.prev_gradient = gradient
 
     def _update_subspace(self, gamma, w):
@@ -120,7 +135,7 @@ U_true = orth(np.random.randn(n, d))
 U_true = np.eye(n, d)
 
 # Simulation parameters
-num_samples = 1000
+num_samples = 10000
 outlier_fraction = 0.1  # Fraction of entries that are outliers
 observation_fraction = 0.3  # Fraction of entries that are observed
 noise_std = 1e-3  # Standard deviation of Gaussian noise
@@ -131,7 +146,8 @@ observation_fraction = 0.5
 noise_std = 1e-5
 
 U_errs = []
-for t in range(num_samples):
+from tqdm import tqdm
+for t in tqdm(range(num_samples)):
     # Generate weight vector
     w_t = np.random.randn(d, 1)
     
