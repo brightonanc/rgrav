@@ -13,7 +13,7 @@ from src.util import *
 
 
 datasets = ['canoe', 'highway']
-dataset = 'highway'
+dataset = 'canoe'
 loader = Loader_CDW(dataset)
 X = []
 for i in range(loader.n_samples):
@@ -36,7 +36,7 @@ X = X.reshape(n_samples, n_dims).T
 imgs_mean = X.mean(dim=1)
 print('data flattened: ', X.shape)
 
-K = 5
+K = 20
 n_split = n_samples // K
 n_samples = n_split * K
 X = X[:, :n_samples]
@@ -54,22 +54,26 @@ U_arr = torch.stack(U_arr, dim=0)
 U_aves = dict()
 rgrav = AsymptoticRGrAv(0.5)
 U_aves['RGrAv'] = rgrav.average(U_arr)
-# run GRASTA
+# U_aves['RGrAv'] = torch.linalg.qr(torch.randn(n_dims, K))[0]
 
+# run GRASTA
 grasta_losses = []
-grasta = GRASTA(n_dims, K, C=1e0)
+grasta = GRASTA(n_dims, K, C=1e-1)
+observation_fraction = 0.3
 for n in tqdm(range(100), 'Running GRASTA'):
+    break
     sample = X[:, n:n+1].cpu().numpy() / 100
     omega = np.arange(n_dims)
-    grasta.add_data(sample, omega)
+    np.random.choice(n, int(observation_fraction * n), replace=False)
+    v_omega = sample[omega]
+    grasta.add_data(v_omega, omega)
     grasta_U = torch.from_numpy(grasta.U).float()
     grasta_losses.append(grassmannian_dist_chordal(grasta_U, U_aves['RGrAv']))
-U_aves['GRASTA'] = grasta_U
+U_aves['GRASTA'] = torch.from_numpy(grasta.U).float()
 
 plt.figure()
 plt.title('GRASTA Loss')
 plt.plot(grasta_losses)
-plt.show()
 
 if not os.path.exists('plots'):
     os.makedirs('plots')
@@ -104,17 +108,17 @@ for ave_type in U_aves:
 
 frame_nums = range(0, n_samples, 100)
 for frame in frame_nums:
-    plt.figure()
+    plt.figure(figsize=(12, 4))
     plt.subplot(1, 3, 1)
     plt.title('Original')
     plt.imshow(X[:, frame].view(im_shape))
     for a, ave_type in enumerate(U_aves):
-        img_back = all_img_backs[ave_type][frame]
+        img_fore = all_img_fores[ave_type][frame]
         plt.subplot(1, 3, a+2)
         plt.title(ave_type)
-        plt.imshow(img_back)
-    plt.savefig(f'plots/background_{dataset}_{frame}.png')
+        plt.imshow(img_fore)
+    plt.savefig(f'plots/foreground_{dataset}_{frame}.png')
     plt.close()
 
-plt.show()
+# plt.show()
 
