@@ -40,7 +40,7 @@ K = 10
 n_split = n_samples // K
 n_samples = n_split * K
 X = X[:, :n_samples]
-X_batches = torch.split(X, n_split, dim=1)
+X_batches = torch.split(X, K, dim=1)
 print('single batch shape: ',X_batches[0].shape)
 
 U_arr = []
@@ -51,9 +51,24 @@ for i in tqdm(range(len(X_batches))):
 U_arr = torch.stack(U_arr, dim=0)
 
 
+U_aves = dict()
 rgrav = AsymptoticRGrAv(0.5)
-U_ave = rgrav.average(U_arr)
+U_aves['RGrAv'] = rgrav.average(U_arr)
+# run GRASTA
 
+grasta_losses = []
+grasta = GRASTA(n_dims, K, C=1e-2)
+for n in tqdm(range(100), 'Running GRASTA'):
+    sample = X[:, n:n+1].cpu().numpy() / 100
+    omega = np.arange(n_dims)
+    grasta.add_data(sample, omega)
+    grasta_U = torch.from_numpy(grasta.U).float()
+    grasta_losses.append(grassmannian_dist_chordal(grasta_U, U_aves['RGrAv']))
+
+plt.figure()
+plt.title('GRASTA Loss')
+plt.plot(grasta_losses)
+plt.show()
 
 if not os.path.exists('plots'):
     os.makedirs('plots')

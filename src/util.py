@@ -156,6 +156,12 @@ def grassmannian_dist(U1, U2, assume_ortho=False):
     theta = torch.acos(c)
     return torch.linalg.norm(theta, dim=-1)
 
+def grassmannian_dist_chordal(U1, U2):
+    assert U1.shape == U2.shape
+    assert len(U1.shape) == 2
+    k = U1.shape[1]
+    return k - torch.linalg.norm(U1.T @ U2) ** 2
+
 def grassmannian_log(U1, U2):
     """
     Computes the Grassmannian logarithm between two orthobases

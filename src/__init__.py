@@ -7,4 +7,5 @@ from .block_power_method import *
 from .power_method_plus_frequent_directions import *
 from .deepca import *
 from .rgrav import *
+from .grasta import *
 from .clustering import *
