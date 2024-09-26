@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import orth
 
 class GRASTA:
-    def __init__(self, n, d, rho=1, max_iterations=20, tol=1e-5):
+    def __init__(self, n, d, rho=1, max_iterations=20, tol=1e-5, C=1e1):
         self.n = n  # Ambient dimension
         self.d = d  # Subspace dimension
         self.rho = rho  # ADMM parameter
@@ -14,7 +14,7 @@ class GRASTA:
         self.U = orth(np.random.randn(n, d))
         
         # Adaptive step size parameters
-        self.C = 10
+        self.C = C
         self.eta = 0.1
         self.mu0 = 3
         self.mu = self.mu0
@@ -90,7 +90,6 @@ class GRASTA:
                 self.mu = self.mu0
             elif self.mu <= mumin:
                 self.level += 1
-                print('level', self.level)
                 self.mu = self.mu0
         
         self.eta = self.C * (2 ** -self.level) / (1 + self.mu)
@@ -121,57 +120,51 @@ class GRASTA:
         return s, w
 
 
-import numpy as np
-from scipy.linalg import orth
+if __name__ == '__main__':
+    # Example usage
+    n = 50  # Ambient dimension
+    d = 5    # Subspace dimension
 
-# Example usage
-n = 500  # Ambient dimension
-d = 5    # Subspace dimension
+    grasta = GRASTA(n, d)
 
-grasta = GRASTA(n, d)
+    # Generate true subspace
+    U_true = orth(np.random.randn(n, d))
+    U_true = np.eye(n, d)
 
-# Generate true subspace
-U_true = orth(np.random.randn(n, d))
-U_true = np.eye(n, d)
-
-# Simulation parameters
-num_samples = 10000
-outlier_fraction = 0.1  # Fraction of entries that are outliers
-observation_fraction = 0.3  # Fraction of entries that are observed
-noise_std = 1e-3  # Standard deviation of Gaussian noise
-
-# really easy case (hopefully)
-outlier_fraction = 0.01
-observation_fraction = 0.5
-noise_std = 1e-5
-
-U_errs = []
-from tqdm import tqdm
-for t in tqdm(range(num_samples)):
-    # Generate weight vector
-    w_t = np.random.randn(d, 1)
-    
-    # Generate sparse outlier vector
-    s_t = np.zeros((n, 1))
-    outlier_indices = np.random.choice(n, int(outlier_fraction * n), replace=False)
-    s_t[outlier_indices] = np.random.randn(len(outlier_indices), 1) * np.max(np.abs(U_true @ w_t))
-    
-    # Generate Gaussian noise vector
-    zeta_t = np.random.randn(n, 1) * noise_std
-    
-    # Generate full vector
-    v_t = U_true @ w_t + s_t + zeta_t
-    
-    # Randomly sample some entries
-    omega = np.random.choice(n, int(observation_fraction * n), replace=False)
-    chi = np.eye(n)[omega]
-    v_omega = v_t[omega]
-    
-    # Update GRASTA with new data
-    s_est, w_est = grasta.add_data(v_omega, omega)
-    U_errs.append(d - np.linalg.norm(grasta.U.T @ U_true) ** 2)
+    # Simulation parameters
+    num_samples = 10000
+    outlier_fraction = 0.1  # Fraction of entries that are outliers
+    observation_fraction = 0.3  # Fraction of entries that are observed
+    noise_std = 1e-3  # Standard deviation of Gaussian noise
 
 
-plt.figure()
-plt.plot(U_errs)
-plt.show()
+    U_errs = []
+    from tqdm import tqdm
+    for t in tqdm(range(num_samples)):
+        # Generate weight vector
+        w_t = np.random.randn(d, 1)
+        
+        # Generate sparse outlier vector
+        s_t = np.zeros((n, 1))
+        outlier_indices = np.random.choice(n, int(outlier_fraction * n), replace=False)
+        s_t[outlier_indices] = np.random.randn(len(outlier_indices), 1) * np.max(np.abs(U_true @ w_t))
+        
+        # Generate Gaussian noise vector
+        zeta_t = np.random.randn(n, 1) * noise_std
+        
+        # Generate full vector
+        v_t = U_true @ w_t + s_t + zeta_t
+        
+        # Randomly sample some entries
+        omega = np.random.choice(n, int(observation_fraction * n), replace=False)
+        chi = np.eye(n)[omega]
+        v_omega = v_t[omega]
+        
+        # Update GRASTA with new data
+        s_est, w_est = grasta.add_data(v_omega, omega)
+        U_errs.append(d - np.linalg.norm(grasta.U.T @ U_true) ** 2)
+
+
+    plt.figure()
+    plt.plot(U_errs)
+    plt.show()
