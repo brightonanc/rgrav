@@ -5,6 +5,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import time
 
 from data_sources.video_separation import Loader_CDW
 from src import *
@@ -46,25 +47,26 @@ X = X[:, :n_samples]
 X_batches = torch.split(X, K, dim=1)
 print('single batch shape: ',X_batches[0].shape)
 
+# Benchmark batch SVDs + RGrAv
+start_time = time.time()
 U_arr = []
-for i in tqdm(range(len(X_batches))):
+for i in tqdm(range(len(X_batches)), desc='Batch SVDs'):
     X_batch = X_batches[i]
     U, S, Vt = torch.linalg.svd(X_batch, full_matrices=False)
     U_arr.append(U)
 U_arr = torch.stack(U_arr, dim=0)
 
-
 U_aves = dict()
 rgrav = AsymptoticRGrAv(0.5)
 U_aves['RGrAv'] = rgrav.average(U_arr)
-# U_aves['RGrAv'] = torch.linalg.qr(torch.randn(n_dims, K))[0]
+rgrav_time = time.time() - start_time
 
-# run GRASTA
+# Benchmark GRASTA
+start_time = time.time()
 grasta_losses = []
 grasta = GRASTA(n_dims, K, C=1e-1)
 observation_fraction = 0.3
 for n in tqdm(range(100), 'Running GRASTA'):
-    break
     sample = X[:, n:n+1].cpu().numpy() / 100
     omega = np.arange(n_dims)
     np.random.choice(n, int(observation_fraction * n), replace=False)
@@ -73,6 +75,14 @@ for n in tqdm(range(100), 'Running GRASTA'):
     grasta_U = torch.from_numpy(grasta.U).float()
     grasta_losses.append(grassmannian_dist_chordal(grasta_U, U_aves['RGrAv']))
 U_aves['GRASTA'] = torch.from_numpy(grasta.U).float()
+grasta_time = time.time() - start_time
+
+# Print benchmark results
+print("\nBenchmark Results:")
+print(f"{'Method':<20}{'Time (seconds)':<20}")
+print("-" * 40)
+print(f"{'Batch SVDs + RGrAv':<20}{rgrav_time:<20.2f}")
+print(f"{'GRASTA':<20}{grasta_time:<20.2f}")
 
 plt.figure()
 plt.title('GRASTA Loss')
@@ -124,4 +134,3 @@ for frame in frame_nums:
     plt.close()
 
 # plt.show()
-
