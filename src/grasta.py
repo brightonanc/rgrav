@@ -1,8 +1,9 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.linalg import orth
 
 class GRASTA:
-    def __init__(self, n, d, rho=1, max_iterations=20, tol=1e-4):
+    def __init__(self, n, d, rho=1, max_iterations=20, tol=1e-5):
         self.n = n  # Ambient dimension
         self.d = d  # Subspace dimension
         self.rho = rho  # ADMM parameter
@@ -33,10 +34,11 @@ class GRASTA:
         
         for _ in range(self.max_iterations):
             # Update w
-            w = np.linalg.solve(U_omega.T @ U_omega, U_omega.T @ (v_omega - s + y / self.rho))
+            P = np.linalg.inv(U_omega.T @ U_omega) @ U_omega.T
+            w = (1 / self.rho) * P @ (self.rho * (v_omega - s) - y)
             
             # Update s
-            s_new = v_omega - U_omega @ w + y
+            s_new = v_omega - U_omega @ w - y
             s_new = self.soft_threshold(s_new, 1 / (1 + self.rho))
             
             # Update y
@@ -44,8 +46,9 @@ class GRASTA:
             
             # Check convergence
             primal_residual = np.linalg.norm(U_omega @ w + s_new - v_omega)
-            dual_residual = self.rho * np.linalg.norm(s_new - s)
+            dual_residual = self.rho * np.linalg.norm(U_omega.T @ (s_new - s))
             
+            # print('residuals', primal_residual, dual_residual)
             if primal_residual < self.tol and dual_residual < self.tol:
                 break
             
@@ -114,12 +117,18 @@ grasta = GRASTA(n, d)
 
 # Generate true subspace
 U_true = orth(np.random.randn(n, d))
+U_true = np.eye(n, d)
 
 # Simulation parameters
 num_samples = 1000
 outlier_fraction = 0.1  # Fraction of entries that are outliers
 observation_fraction = 0.3  # Fraction of entries that are observed
 noise_std = 1e-3  # Standard deviation of Gaussian noise
+
+# really easy case (hopefully)
+outlier_fraction = 0.01
+observation_fraction = 0.5
+noise_std = 1e-5
 
 U_errs = []
 for t in range(num_samples):
@@ -139,6 +148,7 @@ for t in range(num_samples):
     
     # Randomly sample some entries
     omega = np.random.choice(n, int(observation_fraction * n), replace=False)
+    chi = np.eye(n)[omega]
     v_omega = v_t[omega]
     
     # Update GRASTA with new data
@@ -146,7 +156,6 @@ for t in range(num_samples):
     U_errs.append(d - np.linalg.norm(grasta.U.T @ U_true) ** 2)
 
 
-import matplotlib.pyplot as plt
 plt.figure()
 plt.plot(U_errs)
 plt.show()
