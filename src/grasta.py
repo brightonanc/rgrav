@@ -24,9 +24,9 @@ class GRASTA:
         U_omega = self.U[omega, :]
         
         # Initialize variables
-        s = np.zeros(len(omega))
-        w = np.zeros(self.d)
-        y = np.zeros(len(omega))
+        s = np.zeros((len(omega), 1))
+        w = np.zeros((self.d, 1))
+        y = np.zeros((len(omega), 1))
         
         for _ in range(self.max_iterations):
             # Update w
@@ -53,12 +53,13 @@ class GRASTA:
         U_omega = self.U[omega, :]
         gamma1 = y + self.rho * (U_omega @ w + s - v_omega)
         gamma2 = U_omega.T @ gamma1
-        gamma = np.zeros(self.n)
+        gamma = np.zeros((self.n, 1))
         gamma[omega] = gamma1
         gamma -= self.U @ gamma2
-        return gamma[:, np.newaxis] @ w[np.newaxis, :]
+        return gamma, w
 
-    def _update_step_size(self, gradient):
+    def _update_step_size(self, gamma, w):
+        gradient = gamma @ w.T
         if self.prev_gradient is not None:
             inner_product = np.sum(self.prev_gradient * gradient)
             self.mu = max(self.mu + np.tanh(-inner_product), 1)
@@ -73,10 +74,13 @@ class GRASTA:
         self.eta = 0.1 * (2 ** -self.level) / (1 + self.mu)
         self.prev_gradient = gradient
 
-    def _update_subspace(self, gradient, w):
+    def _update_subspace(self, gamma, w):
+        gradient = gamma @ w.T
         sigma = np.linalg.norm(gradient) * np.linalg.norm(w)
-        U_new = self.U + ((np.cos(self.eta * sigma) - 1) * self.U @ (w[:, np.newaxis] / np.linalg.norm(w)) -
-                          np.sin(self.eta * sigma) * gradient / np.linalg.norm(gradient)) @ (w / np.linalg.norm(w))[np.newaxis, :]
+        w_norm = w / np.linalg.norm(w)
+        gam_norm = gamma / np.linalg.norm(gamma)
+        U_new = self.U + ((np.cos(self.eta * sigma) - 1) * (self.U @ w_norm) -
+                          np.sin(self.eta * sigma) * gam_norm) @ w_norm.T
         self.U = orth(U_new)
 
     def add_data(self, v_omega, omega):
@@ -84,13 +88,13 @@ class GRASTA:
         s, w, y = self._admm_solver(v_omega, omega)
         
         # Compute gradient
-        gradient = self._compute_gradient(s, w, y, v_omega, omega)
+        gamma, w = self._compute_gradient(s, w, y, v_omega, omega)
         
         # Update step size
-        self._update_step_size(gradient)
+        self._update_step_size(gamma, w)
         
         # Update subspace
-        self._update_subspace(gradient, w)
+        self._update_subspace(gamma, w)
         
         return s, w
 
@@ -113,17 +117,18 @@ outlier_fraction = 0.1  # Fraction of entries that are outliers
 observation_fraction = 0.3  # Fraction of entries that are observed
 noise_std = 1e-3  # Standard deviation of Gaussian noise
 
+U_errs = []
 for t in range(num_samples):
     # Generate weight vector
-    w_t = np.random.randn(d)
+    w_t = np.random.randn(d, 1)
     
     # Generate sparse outlier vector
-    s_t = np.zeros(n)
+    s_t = np.zeros((n, 1))
     outlier_indices = np.random.choice(n, int(outlier_fraction * n), replace=False)
-    s_t[outlier_indices] = np.random.randn(len(outlier_indices)) * np.max(np.abs(U_true @ w_t))
+    s_t[outlier_indices] = np.random.randn(len(outlier_indices), 1) * np.max(np.abs(U_true @ w_t))
     
     # Generate Gaussian noise vector
-    zeta_t = np.random.randn(n) * noise_std
+    zeta_t = np.random.randn(n, 1) * noise_std
     
     # Generate full vector
     v_t = U_true @ w_t + s_t + zeta_t
@@ -134,10 +139,10 @@ for t in range(num_samples):
     
     # Update GRASTA with new data
     s_est, w_est = grasta.add_data(v_omega, omega)
-    
-    # You can add code here to compute and track the error if needed
-    # For example:
-    # subspace_error = np.linalg.norm(grasta.U.T @ U_true - np.eye(d), 'fro')
-    # print(f"Iteration {t}, Subspace Error: {subspace_error}")
+    U_errs.append(d - np.linalg.norm(grasta.U.T @ U_true) ** 2)
 
-# After all iterations, grasta.U contains the final subspace estimate
+
+import matplotlib.pyplot as plt
+plt.figure()
+plt.plot(U_errs)
+plt.show()
