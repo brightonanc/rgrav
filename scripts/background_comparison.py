@@ -36,7 +36,7 @@ X = X.reshape(n_samples, n_dims).T
 imgs_mean = X.mean(dim=1)
 print('data flattened: ', X.shape)
 
-K = 10
+K = 5
 n_split = n_samples // K
 n_samples = n_split * K
 X = X[:, :n_samples]
@@ -57,13 +57,14 @@ U_aves['RGrAv'] = rgrav.average(U_arr)
 # run GRASTA
 
 grasta_losses = []
-grasta = GRASTA(n_dims, K, C=1e-2)
+grasta = GRASTA(n_dims, K, C=1e0)
 for n in tqdm(range(100), 'Running GRASTA'):
     sample = X[:, n:n+1].cpu().numpy() / 100
     omega = np.arange(n_dims)
     grasta.add_data(sample, omega)
     grasta_U = torch.from_numpy(grasta.U).float()
     grasta_losses.append(grassmannian_dist_chordal(grasta_U, U_aves['RGrAv']))
+U_aves['GRASTA'] = grasta_U
 
 plt.figure()
 plt.title('GRASTA Loss')
@@ -74,39 +75,46 @@ if not os.path.exists('plots'):
     os.makedirs('plots')
 
 # do background subtraction and plot video
-img_backs = []
-img_fores = []
-for i in range(n_samples):
-    img_flat = X[:, i]
-    img = img_flat.view(im_shape)
-    img_back = U_ave @ (U_ave.T @ (img_flat - imgs_mean)) + imgs_mean
-    img_fore = img_flat - img_back
-    
-    img_back = img_back.view(im_shape)
-    img_fore = img_fore.view(im_shape)
-    img_backs.append(img_back)
-    img_fores.append(img_fore)
+all_img_backs = dict()
+all_img_fores = dict()
+for ave_type in U_aves:
+    img_backs = []
+    img_fores = []
+    U_ave = U_aves[ave_type]
+    for i in range(n_samples):
+        img_flat = X[:, i]
+        img = img_flat.view(im_shape)
+        img_back = U_ave @ (U_ave.T @ (img_flat - imgs_mean)) + imgs_mean
+        img_fore = img_flat - img_back
+        
+        img_back = img_back.view(im_shape)
+        img_fore = img_fore.view(im_shape)
+        img_backs.append(img_back)
+        img_fores.append(img_fore)
 
-# normalize all images from foreground and background
-img_fores = torch.stack(img_fores, dim=0)
-img_backs = torch.stack(img_backs, dim=0)
-print('img fores', img_fores.min(), img_fores.max(), img_fores.mean(), img_fores.std())
-print('img backs', img_backs.min(), img_backs.max(), img_backs.mean(), img_backs.std())
-img_fores += 0.2
-img_fores = torch.clip(img_fores, 0, 1)
-img_backs = torch.clip(img_backs, 0, 1)
+    img_backs = torch.stack(img_backs, dim=0)
+    img_fores = torch.stack(img_fores, dim=0)
+    print('img fores', img_fores.min(), img_fores.max(), img_fores.mean(), img_fores.std())
+    print('img backs', img_backs.min(), img_backs.max(), img_backs.mean(), img_backs.std())
+    img_fores += 0.2
+    img_backs = torch.clip(img_backs, 0, 1)
+    img_fores = torch.clip(img_fores, 0, 1)
+    all_img_backs[ave_type] = img_backs
+    all_img_fores[ave_type] = img_fores
 
-for i in range(5):
-    img = X[:, i].view(im_shape)
-    img_back = img_backs[i]
-    img_fore = img_fores[i]
-    plt.figure(figsize=(12, 4))
-    plt.subplot(131)
-    plt.imshow(img)
-    plt.subplot(132)
-    plt.imshow(img_back)
-    plt.subplot(133)
-    plt.imshow(img_fore)
+frame_nums = range(0, n_samples, 100)
+for frame in frame_nums:
+    plt.figure()
+    plt.subplot(1, 3, 1)
+    plt.title('Original')
+    plt.imshow(X[:, frame].view(im_shape))
+    for a, ave_type in enumerate(U_aves):
+        img_back = all_img_backs[ave_type][frame]
+        plt.subplot(1, 3, a+2)
+        plt.title(ave_type)
+        plt.imshow(img_back)
+    plt.savefig(f'plots/background_{dataset}_{frame}.png')
+    plt.close()
 
 plt.show()
 
