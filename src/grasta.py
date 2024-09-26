@@ -20,6 +20,9 @@ class GRASTA:
         # Previous gradient for adaptive step size
         self.prev_gradient = None
 
+    def soft_threshold(self, x, lambda_):
+        return np.sign(x) * np.maximum(0, np.abs(x) - lambda_)
+
     def _admm_solver(self, v_omega, omega):
         U_omega = self.U[omega, :]
         
@@ -33,7 +36,8 @@ class GRASTA:
             w = np.linalg.solve(U_omega.T @ U_omega, U_omega.T @ (v_omega - s + y / self.rho))
             
             # Update s
-            s_new = np.clip(v_omega - U_omega @ w + y / self.rho, -1/self.rho, 1/self.rho)
+            s_new = v_omega - U_omega @ w + y
+            s_new = self.soft_threshold(s_new, 1 / (1 + self.rho))
             
             # Update y
             y = y + self.rho * (U_omega @ w + s_new - v_omega)
