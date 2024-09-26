@@ -14,6 +14,8 @@ from src.util import *
 
 datasets = ['canoe', 'highway']
 dataset = 'canoe'
+dataset = 'fountain01'
+# dataset = 'fountain02'
 loader = Loader_CDW(dataset)
 X = []
 for i in range(loader.n_samples):
@@ -24,10 +26,11 @@ print('data shape: ', X.shape)
 
 if dataset == 'canoe':
     X = X[800:]
-    print('data shape: ', X.shape)
 elif dataset == 'highway':
     X = X[1300:]
-    print('data shape: ', X.shape)
+elif 'fountain' in dataset:
+    X = X[800:]
+print('data shape: ', X.shape)
 
 n_samples = X.shape[0]
 im_shape = X.shape[1:]
@@ -36,7 +39,7 @@ X = X.reshape(n_samples, n_dims).T
 imgs_mean = X.mean(dim=1)
 print('data flattened: ', X.shape)
 
-K = 20
+K = 10
 n_split = n_samples // K
 n_samples = n_split * K
 X = X[:, :n_samples]
