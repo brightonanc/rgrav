@@ -10,6 +10,7 @@ N = 100
 K = 10
 n_points = 100
 n_centers = 10
+n_means = n_centers * 2
 center_dist = 1.0
 center_radius = 0.1
 points, U_centers = generate_cluster_data(N, K, n_centers, n_points, center_dist, center_radius)
@@ -29,7 +30,7 @@ timers = dict()
 for ave_algo in ave_algos:
     print('running clustering with', ave_algo)
     timers[ave_algo] = TimeAccumulator()
-    clusters[ave_algo] = timers[ave_algo].time_func(clustering_algos[ave_algo].cluster, points, n_centers)
+    clusters[ave_algo] = timers[ave_algo].time_func(clustering_algos[ave_algo].cluster, points, n_means)
 
 print("\nClusteringBenchmark Results:")
 print(f"{'Method':<20}{'Time (seconds)':<20}")
@@ -41,7 +42,7 @@ print()
 all_cluster_dists = dict()
 for ave_algo in ave_algos:
     all_cluster_dists[ave_algo] = []
-    for i in range(n_centers):
+    for i in range(n_means):
         all_cluster_dists[ave_algo].append([])
         for j in range(n_centers):
             if ave_algo == 'Flag':
@@ -53,7 +54,7 @@ plt.figure()
 for m, ave_algo in enumerate(ave_algos):
     plt.subplot(131 + m)
     plt.title(ave_algo)
-    plt.imshow(all_cluster_dists[ave_algo])
+    plt.imshow(all_cluster_dists[ave_algo], aspect='auto')
     plt.colorbar()
 
 # compute sum of squared errors for all points and all algorithms

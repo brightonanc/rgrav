@@ -9,7 +9,7 @@ class SubspaceClustering:
         self.ave_algo = ave_algo
         self.dist_func = dist_func
         self.n_iters = 100
-        self.center_tol = 1e-1
+        self.center_tol = 1e-3
 
     def assign_clusters(self, points, centers):
         dists = torch.stack([torch.stack([self.dist_func(center, point) for center in centers]) for point in points])
@@ -70,7 +70,7 @@ class SubspaceClusteringFlagpole:
     def __init__(self):
         self.ave_algo = FlagMean()
         self.n_iters = 100
-        self.center_tol = 1e-1
+        self.center_tol = 1e-3
 
     def assign_clusters(self, points, centers):
         dists = torch.stack([torch.stack([flagpole_subspace_distance(center, point) for center in centers]) for point in points])
