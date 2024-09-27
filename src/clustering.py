@@ -77,11 +77,16 @@ class SubspaceClusteringFlagpole:
         cluster_assignments = torch.argmin(dists, dim=1)
         return cluster_assignments
 
-    def get_random_flagpole(self, points):
+    def get_random_flagpole_batch(self, points):
         inds = torch.randint(0, points.shape[0], (20,))
         batch = [points[ind.item()] for ind in inds]
         batch = torch.stack(batch, dim=0)
         rand_flagpole = self.ave_algo.average(batch)
+        return rand_flagpole
+
+    def get_random_flagpole(self, points):
+        ind = torch.randint(0, points.shape[0], (1,)).item()
+        rand_flagpole = get_flagpole(points[ind])
         return rand_flagpole
 
     def cluster(self, points, n_centers):

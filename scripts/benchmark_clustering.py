@@ -6,8 +6,8 @@ from src.util import grassmannian_dist_chordal
 from src.timing import time_func, TimeAccumulator
 
 
-N = 100
-K = 10
+N = 1000
+K = 5
 n_points = 100
 n_centers = 10
 n_means = n_centers * 2
