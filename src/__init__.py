@@ -8,4 +8,5 @@ from .power_method_plus_frequent_directions import *
 from .deepca import *
 from .rgrav import *
 from .grasta import *
+from .flag_mean import *
 from .clustering import *
