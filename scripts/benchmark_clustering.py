@@ -18,11 +18,16 @@ points, U_centers = generate_cluster_data(N, K, n_centers, n_points, center_dist
 ave_algos = dict(RGrAv=AsymptoticRGrAv(0.5), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent())
 dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_distance, Frechet=grassmannian_dist_chordal)
 clustering_algos = dict()
+for ave_algo in ave_algos:
+    if ave_algo == 'Flag':
+        clustering_algos[ave_algo] = SubspaceClusteringFlagpole()
+    else:
+        clustering_algos[ave_algo] = SubspaceClustering(ave_algos[ave_algo], dist_funcs[ave_algo])
+
 clusters = dict()
 timers = dict()
 for ave_algo in ave_algos:
     print('running clustering with', ave_algo)
-    clustering_algos[ave_algo] = SubspaceClustering(ave_algos[ave_algo], dist_funcs[ave_algo])
     timers[ave_algo] = TimeAccumulator()
     clusters[ave_algo] = timers[ave_algo].time_func(clustering_algos[ave_algo].cluster, points, n_centers)
 
