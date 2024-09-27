@@ -15,10 +15,24 @@ center_radius = 0.1
 points, U_centers = generate_cluster_data(N, K, n_centers, n_points, center_dist, center_radius)
 
 # do clustering
-ave_algos = [AsymptoticRGrAv(0.5), FlagMean(), FrechetMeanByGradientDescent()]
+ave_algos = dict(RGrAv=AsymptoticRGrAv(0.5), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent())
+dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_distance, Frechet=grassmannian_dist_chordal)
+clustering_algos = dict()
+clusters = dict()
+timers = dict()
 for ave_algo in ave_algos:
-    clustering_algo = SubspaceClustering(ave_algo)
-clusters = clustering_algo.cluster(points, n_centers)
+    print('running clustering with', ave_algo)
+    clustering_algos[ave_algo] = SubspaceClustering(ave_algos[ave_algo], dist_funcs[ave_algo])
+    timers[ave_algo] = TimeAccumulator()
+    clusters[ave_algo] = timers[ave_algo].time_func(clustering_algos[ave_algo].cluster, points, n_centers)
+
+print("\nClusteringBenchmark Results:")
+print(f"{'Method':<20}{'Time (seconds)':<20}")
+print("-" * 40)
+for ave_algo, timer in timers.items():
+    print(f"{ave_algo:<20}{timer.mean_time():<20.2f}")
+print()
+exit()
 
 closest_centers = []
 for cluster in clusters:

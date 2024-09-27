@@ -30,3 +30,6 @@ class TimeAccumulator:
 
     def total_time(self):
         return sum(self.times)
+
+    def mean_time(self):
+        return sum(self.times) / len(self.times)
