@@ -37,28 +37,39 @@ print("-" * 40)
 for ave_algo, timer in timers.items():
     print(f"{ave_algo:<20}{timer.mean_time():<20.2f}")
 print()
-exit()
 
-closest_centers = []
-for cluster in clusters:
-    dists = torch.stack([grassmannian_dist_chordal(Uc, cluster) for Uc in U_centers])
-    closest_centers.append(torch.argmin(dists))
-
-cluster_dists = []
-for i in range(n_centers):
-    cluster_dist = grassmannian_dist_chordal(U_centers[i], clusters[i])
-    cluster_dists.append(cluster_dist)
-
-print('cluster distances', cluster_dists)
-print('closest centers', closest_centers)
-
-all_cluster_dists = []
-for i in range(n_centers):
-    all_cluster_dists.append([])
-    for j in range(n_centers):
-        all_cluster_dists[i].append(grassmannian_dist_chordal(clusters[i], U_centers[j]))
+all_cluster_dists = dict()
+for ave_algo in ave_algos:
+    all_cluster_dists[ave_algo] = []
+    for i in range(n_centers):
+        all_cluster_dists[ave_algo].append([])
+        for j in range(n_centers):
+            if ave_algo == 'Flag':
+                all_cluster_dists[ave_algo][i].append(flagpole_subspace_distance(clusters[ave_algo][i], U_centers[j]))
+            else:
+                all_cluster_dists[ave_algo][i].append(grassmannian_dist_chordal(clusters[ave_algo][i], U_centers[j]))
 
 plt.figure()
-plt.imshow(all_cluster_dists)
-plt.colorbar()
+for m, ave_algo in enumerate(ave_algos):
+    plt.subplot(131 + m)
+    plt.title(ave_algo)
+    plt.imshow(all_cluster_dists[ave_algo])
+    plt.colorbar()
+
+# compute sum of squared errors for all points and all algorithms
+for ave_algo in ave_algos:
+    if ave_algo == 'Flag':
+        dist_func = flagpole_subspace_distance
+    else:
+        dist_func = grassmannian_dist_chordal
+    sum_squared_errors = 0
+    for i in range(len(points)):
+        min_dist = 1e9
+        for j in range(len(clusters[ave_algo])):
+            dist = dist_func(points[i], clusters[ave_algo][j])
+            if dist < min_dist:
+                min_dist = dist
+        sum_squared_errors += min_dist ** 2
+    print(f"{ave_algo}: {sum_squared_errors}")
+
 plt.show()
