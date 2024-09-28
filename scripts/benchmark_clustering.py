@@ -1,4 +1,5 @@
 import torch
+import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -7,9 +8,13 @@ from src import *
 from src.util import grassmannian_dist_chordal
 from src.timing import time_func, TimeAccumulator
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 def run_clustering_benchmark(N, K, n_points, n_centers, n_means, n_trials=3):
     ave_algos = dict(RGrAv=AsymptoticRGrAv(0.5), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent())
     dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_distance, Frechet=grassmannian_dist_chordal)
+    del ave_algos['Frechet']
+    del dist_funcs['Frechet']
     clustering_algos = dict()
     for ave_algo in ave_algos:
         if ave_algo == 'Flag':
@@ -22,6 +27,8 @@ def run_clustering_benchmark(N, K, n_points, n_centers, n_means, n_trials=3):
 
     for _ in range(n_trials):
         points, U_centers = generate_cluster_data(N, K, n_centers, n_points, center_dist=1.0, center_radius=0.1)
+        points = points.to(device)
+        U_centers = torch.stack(U_centers, dim=0).to(device)
         
         for ave_algo in ave_algos:
             clusters = timers[ave_algo].time_func(clustering_algos[ave_algo].cluster, points, n_means)
@@ -47,15 +54,17 @@ def run_clustering_benchmark(N, K, n_points, n_centers, n_means, n_trials=3):
     return {algo: (timer.mean_time(), performances[algo]) for algo, timer in timers.items()}
 
 def parameter_sweep(param_name, param_values, fixed_params):
-    results = {algo: {'times': [], 'performances': []} for algo in ['RGrAv', 'Flag', 'Frechet']}
+    results = dict()
     
     for value in tqdm(param_values, desc=f"Sweeping {param_name}"):
         params = fixed_params.copy()
         params[param_name] = value
         benchmark_results = run_clustering_benchmark(**params)
         
-        for algo in results:
+        for algo in benchmark_results:
             time, performance = benchmark_results[algo]
+            if algo not in results:
+                results[algo] = {'times': [], 'performances': []}
             results[algo]['times'].append(time)
             results[algo]['performances'].append(performance)
     
@@ -63,35 +72,36 @@ def parameter_sweep(param_name, param_values, fixed_params):
 
 # Set up the fixed parameters and sweep ranges
 fixed_params = {
-    'N': 500,
-    'K': 5,
+    'N': 1000,
+    'K': 50,
     'n_points': 100,
-    'n_centers': 10,
-    'n_means': 20,
-    'n_trials': 3,
+    'n_centers': 5,
+    'n_means': 10,
+    'n_trials': 1,
 }
 
 sweep_params = {
-    'N': np.linspace(100, 1000, 10, dtype=int),
-    'K': np.arange(2, 11),
-    'n_points': np.linspace(50, 500, 10, dtype=int),
-    'n_centers': np.arange(5, 21),
-    'n_means': np.arange(10, 41, 2)
+    'N': [100, 200, 500, 1000],
+    'K': [5, 10, 20, 50, 100],
+    # 'n_points': np.linspace(10, 100, 10, dtype=int),
+    # 'n_centers': np.arange(5, 11),
+    # 'n_means': np.arange(10, 21, 2)
 }
 
 # Perform parameter sweeps
 all_results = {}
 for param, values in sweep_params.items():
     all_results[param] = parameter_sweep(param, values, fixed_params)
+pickle.dump(all_results, open('all_results.pkl', 'wb'))
 
 # Plotting results
 for param, values in sweep_params.items():
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
     fig.suptitle(f'Parameter Sweep: {param}')
     
-    for algo in ['RGrAv', 'Flag', 'Frechet']:
-        ax1.plot(values, all_results[param][algo]['times'], label=algo)
-        ax2.plot(values, all_results[param][algo]['performances'], label=algo)
+    for algo in all_results[param]:
+        ax1.plot(values, all_results[param][algo]['times'].cpu().numpy(), label=algo)
+        ax2.plot(values, all_results[param][algo]['performances'].cpu().numpy(), label=algo)
     
     ax1.set_ylabel('Time (seconds)')
     ax1.legend()

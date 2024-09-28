@@ -30,7 +30,7 @@ class SubspaceClustering:
             ind = torch.randint(0, points.shape[0], (1,)).item()
             U_centers.append(points[ind])
 
-        for i in tqdm(range(self.n_iters)):
+        for i in range(self.n_iters):
             # if two centers are too close, reinit one
             for i in range(n_centers):
                 for j in range(i+1, n_centers):
@@ -48,7 +48,7 @@ class SubspaceClustering:
                 if len(cluster_points) > 0:
                     new_center = self.ave_algo.average(cluster_points)
                 else:
-                    print('no points in cluster', i)
+                    # print('no points in cluster', i)
                     ind = torch.randint(0, points.shape[0], (1,)).item()
                     new_center = points[ind]
                 center_changes.append(self.dist_func(U_centers[i], new_center))
@@ -102,7 +102,7 @@ class SubspaceClusteringFlagpole:
         for i in range(n_centers):
             U_centers.append(self.get_random_flagpole(points))
 
-        for i in tqdm(range(self.n_iters)):
+        for i in range(self.n_iters):
             # if two centers are too close, reinit one
             for i in range(n_centers):
                 for j in range(i+1, n_centers):
@@ -119,7 +119,7 @@ class SubspaceClusteringFlagpole:
                 if len(cluster_points) > 0:
                     new_center = self.ave_algo.average(cluster_points)
                 else:
-                    print('no points in cluster', i)
+                    # print('no points in cluster', i)
                     new_center = self.get_random_flagpole(points)
                 center_changes.append(flagpole_distance(U_centers[i], new_center))
                 U_centers[i] = new_center
