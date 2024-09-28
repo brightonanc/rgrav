@@ -11,7 +11,7 @@ from src.timing import time_func, TimeAccumulator
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def run_clustering_benchmark(N, K, n_points, n_centers, n_means, n_trials=3):
-    ave_algos = dict(RGrAv=AsymptoticRGrAv(0.5), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent())
+    ave_algos = dict(RGrAv=AsymptoticRGrAv(0.1), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent())
     dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_distance, Frechet=grassmannian_dist_chordal)
     del ave_algos['Frechet']
     del dist_funcs['Frechet']
@@ -67,13 +67,17 @@ def parameter_sweep(param_name, param_values, fixed_params):
                 results[algo] = {'times': [], 'performances': []}
             results[algo]['times'].append(time)
             results[algo]['performances'].append(performance)
+
+    for algo in results:
+        results[algo]['times'] = torch.tensor(results[algo]['times'])
+        results[algo]['performances'] = torch.tensor(results[algo]['performances'])
     
     return results
 
 # Set up the fixed parameters and sweep ranges
 fixed_params = {
     'N': 1000,
-    'K': 50,
+    'K': 10,
     'n_points': 100,
     'n_centers': 5,
     'n_means': 10,
@@ -86,6 +90,16 @@ sweep_params = {
     # 'n_points': np.linspace(10, 100, 10, dtype=int),
     # 'n_centers': np.arange(5, 11),
     # 'n_means': np.arange(10, 21, 2)
+}
+
+sweep_params = {
+    'N': [1000, 500, 200, 100],
+}
+sweep_params = {
+    'K': [100, 50, 20, 10],
+}
+sweep_params = {
+    'n_points': np.geomspace(10, 200, 5, dtype=int)[::-1],
 }
 
 # Perform parameter sweeps

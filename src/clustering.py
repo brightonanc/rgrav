@@ -46,7 +46,7 @@ class SubspaceClustering:
             for i in range(n_centers):
                 cluster_points = points[cluster_assignments == i]
                 if len(cluster_points) > 0:
-                    new_center = self.ave_algo.average(cluster_points)
+                    new_center = self.ave_algo.average(cluster_points, max_iter=5)
                 else:
                     # print('no points in cluster', i)
                     ind = torch.randint(0, points.shape[0], (1,)).item()
