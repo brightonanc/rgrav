@@ -12,7 +12,9 @@ from src.timing import *
 
 from data_sources.video_separation import SUMMET_Loader
 
-def run_clustering_benchmark(tracklets, labels, n_centers, n_trials=3):
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def run_clustering_benchmark(U_arr, labels, n_centers, n_trials=3):
     ave_algos = dict(RGrAv=AsymptoticRGrAv(0.1), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent())
     dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_distance, Frechet=grassmannian_dist_chordal)
 
@@ -28,9 +30,9 @@ def run_clustering_benchmark(tracklets, labels, n_centers, n_trials=3):
 
     for _ in range(n_trials):
         for ave_algo in ave_algos:
-            clusters = timers[ave_algo].time_func(clustering_algos[ave_algo].cluster, tracklets, n_centers)
+            clusters = timers[ave_algo].time_func(clustering_algos[ave_algo].cluster, U_arr, n_centers)
             
-            cluster_assignments = clustering_algos[ave_algo].assign_clusters(tracklets, clusters)
+            cluster_assignments = clustering_algos[ave_algo].assign_clusters(U_arr, clusters)
             
             cluster_labels = [[] for _ in range(n_centers)]
             for i, assignment in enumerate(cluster_assignments):
@@ -58,10 +60,13 @@ def run_clustering_benchmark(tracklets, labels, n_centers, n_trials=3):
 summet_loader = SUMMET_Loader()
 tracklets = summet_loader.tracklets
 labels = summet_loader.labels
+tracklets = tracklets.to(device)
 
 # trim to a few tracklets for testing
 tracklets = tracklets[:200]
 labels = labels[:200]
+tracklets = tracklets[:50]
+labels = labels[:50]
 
 unique_labels = set(labels)
 n_labels = len(unique_labels)
@@ -74,6 +79,8 @@ print('flat: ', tracklets_flat.shape)
 print('labels: ', len(labels))
 
 K = 6
+# they actually do full tracklet, not subdivided
+K = tracklets.shape[1]
 n_subs = tracklets.shape[1] // K
 assert n_subs * K == tracklets.shape[1]
 n_tracklets = tracklets.shape[0]
@@ -87,11 +94,11 @@ for i in range(n_subs):
         points.append(U)
         U_labels.append(labels[j])
 U_arr = torch.stack(points, dim=0)
-print('U_arr: ', U_arr.shape)
+print('U_arr: ', U_arr.shape, 'device: ', U_arr.device)
 
 # Run benchmark
 n_centers = 100
-results = run_clustering_benchmark(U_arr, U_labels, n_centers)
+results = run_clustering_benchmark(U_arr, U_labels, n_centers, n_trials=1)
 
 # Plot results
 plt.figure(figsize=(10, 5))
