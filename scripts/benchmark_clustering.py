@@ -72,7 +72,7 @@ fixed_params = {
     'n_points': 100,
     'n_centers': 10,
     'n_means': 20,
-    'n_trials': 5,
+    'n_trials': 3,
 }
 
 sweep_params = {
@@ -106,6 +106,7 @@ sweep_params = {
 all_results = {}
 for param, values in sweep_params.items():
     all_results[param] = parameter_sweep(param, values, fixed_params)
+all_results['sweep_params'] = sweep_params
 pickle.dump(all_results, open('benchmark_clustering_results.pkl', 'wb'))
 
 # Plotting results
