@@ -12,9 +12,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def run_clustering_benchmark(N, K, n_points, n_centers, n_means, n_trials=3):
     ave_algos = dict(RGrAv=AsymptoticRGrAv(0.1), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent())
-    dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_distance, Frechet=grassmannian_dist_chordal)
-    del ave_algos['Frechet']
-    del dist_funcs['Frechet']
+    dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_subspace_distance, Frechet=grassmannian_dist_chordal)
     clustering_algos = dict()
     for ave_algo in ave_algos:
         if ave_algo == 'Flag':
@@ -23,7 +21,7 @@ def run_clustering_benchmark(N, K, n_points, n_centers, n_means, n_trials=3):
             clustering_algos[ave_algo] = SubspaceClustering(ave_algos[ave_algo], dist_funcs[ave_algo])
 
     timers = {algo: TimeAccumulator() for algo in ave_algos}
-    performances = {algo: 0 for algo in ave_algos}
+    performances = {algo: [] for algo in ave_algos}
 
     for _ in range(n_trials):
         points, U_centers = generate_cluster_data(N, K, n_centers, n_points, center_dist=1.0, center_radius=0.1)
@@ -32,26 +30,19 @@ def run_clustering_benchmark(N, K, n_points, n_centers, n_means, n_trials=3):
         
         for ave_algo in ave_algos:
             clusters = timers[ave_algo].time_func(clustering_algos[ave_algo].cluster, points, n_means)
-            
-            if ave_algo == 'Flag':
-                dist_func = flagpole_subspace_distance
-            else:
-                dist_func = grassmannian_dist_chordal
+            dist_func = dist_funcs[ave_algo]
             
             sum_squared_errors = 0
             for i in range(len(points)):
-                min_dist = 1e9
+                min_dist = float('inf')
                 for j in range(len(clusters)):
                     dist = dist_func(points[i], clusters[j])
                     if dist < min_dist:
                         min_dist = dist
                 sum_squared_errors += min_dist ** 2
-            performances[ave_algo] += sum_squared_errors
+            performances[ave_algo].append(sum_squared_errors)
 
-    for algo in performances:
-        performances[algo] /= n_trials
-
-    return {algo: (timer.mean_time(), performances[algo]) for algo, timer in timers.items()}
+    return {algo: (timer.times, performances[algo]) for algo, timer in timers.items()}
 
 def parameter_sweep(param_name, param_values, fixed_params):
     results = dict()
