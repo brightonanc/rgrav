@@ -77,11 +77,11 @@ def parameter_sweep(param_name, param_values, fixed_params):
 # Set up the fixed parameters and sweep ranges
 fixed_params = {
     'N': 1000,
-    'K': 10,
+    'K': 50,
     'n_points': 100,
-    'n_centers': 5,
-    'n_means': 10,
-    'n_trials': 1,
+    'n_centers': 10,
+    'n_means': 20,
+    'n_trials': 3,
 }
 
 sweep_params = {
@@ -99,7 +99,12 @@ sweep_params = {
     'K': [100, 50, 20, 10],
 }
 sweep_params = {
-    'n_points': np.geomspace(10, 200, 5, dtype=int)[::-1],
+    'n_points': np.geomspace(10, 100, 5, dtype=int)[::-1],
+}
+sweep_params = {
+    'N': [1000, 500, 200, 100],
+    'K': [100, 50, 20, 10, 5],
+    'n_points': np.geomspace(10, 500, 10, dtype=int)[::-1],
 }
 
 # Perform parameter sweeps
