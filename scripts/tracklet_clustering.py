@@ -65,8 +65,6 @@ tracklets = tracklets.to(device)
 # trim to a few tracklets for testing
 tracklets = tracklets[:200]
 labels = labels[:200]
-tracklets = tracklets[:50]
-labels = labels[:50]
 
 unique_labels = set(labels)
 n_labels = len(unique_labels)
