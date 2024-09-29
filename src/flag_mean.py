@@ -57,7 +57,8 @@ class FlagMean(GrassmannianAveragingAlgorithm):
         iter_frame = SimpleNamespace()
         U_full = torch.cat([U_arr[i, :, :] for i in range(len(U_arr))], dim=1)
         U, _, __ = torch.linalg.svd(U_full, full_matrices=False)
-        iter_frame.U = get_flagpole(U)
+        r = min(U.shape[1], U_arr.shape[2])
+        iter_frame.U = get_flagpole(U[:, :r])
         return iter_frame
 
     def average(self, U_arr):

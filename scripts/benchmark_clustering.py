@@ -115,7 +115,7 @@ sweep_params = {
 all_results = {}
 for param, values in sweep_params.items():
     all_results[param] = parameter_sweep(param, values, fixed_params)
-pickle.dump(all_results, open('all_results.pkl', 'wb'))
+pickle.dump(all_results, open('benchmark_clustering_results.pkl', 'wb'))
 
 # Plotting results
 for param, values in sweep_params.items():

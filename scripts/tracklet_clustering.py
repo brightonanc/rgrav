@@ -3,6 +3,7 @@
 # i.e., what % of the tracklets in a cluster are of the same class
 
 import torch
+import pickle
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -97,15 +98,16 @@ print('U_arr: ', U_arr.shape, 'device: ', U_arr.device)
 # Run benchmark
 n_centers = 100
 results = run_clustering_benchmark(U_arr, U_labels, n_centers, n_trials=1)
+pickle.dump(results, open('tracklet_clustering_results.pkl', 'wb'))
 
 # Plot results
 plt.figure(figsize=(10, 5))
 algorithms = list(results.keys())
-if 'Frechet' in algorithms:
-    algorithms[algorithms.index('Frechet')] = 'Fréchet'
 times = [results[algo][0] for algo in algorithms]
 purities = [results[algo][1] for algo in algorithms]
 
+if 'Frechet' in algorithms:
+    algorithms[algorithms.index('Frechet')] = 'Fréchet'
 plt.subplot(1, 2, 1)
 plt.bar(algorithms, times)
 plt.title('Runtime Comparison')
