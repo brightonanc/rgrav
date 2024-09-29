@@ -4,7 +4,7 @@
 
 import torch
 import pickle
-import matplotlib.pyplot as plt
+import numpy as np
 from tqdm import tqdm
 
 from src import *
@@ -26,12 +26,13 @@ def run_clustering_benchmark(U_arr, labels, n_centers, n_trials=3):
         else:
             clustering_algos[ave_algo] = SubspaceClustering(ave_algos[ave_algo], dist_funcs[ave_algo])
 
-    timers = {algo: TimeAccumulator() for algo in ave_algos}
-    purities = {algo: 0 for algo in ave_algos}
+    results = {algo: {'times': [], 'purities': []} for algo in ave_algos}
 
     for _ in range(n_trials):
         for ave_algo in ave_algos:
-            clusters = timers[ave_algo].time_func(clustering_algos[ave_algo].cluster, U_arr, n_centers)
+            start_time = time.time()
+            clusters = clustering_algos[ave_algo].cluster(U_arr, n_centers)
+            end_time = time.time()
             
             cluster_assignments = clustering_algos[ave_algo].assign_clusters(U_arr, clusters)
             
@@ -50,12 +51,10 @@ def run_clustering_benchmark(U_arr, labels, n_centers, n_trials=3):
                     dominant_label = max(label_counts, key=label_counts.get)
                     cluster_purity.append(label_counts[dominant_label] / len(cluster))
             
-            purities[ave_algo] += sum(cluster_purity) / len(cluster_purity)
+            results[ave_algo]['times'].append(end_time - start_time)
+            results[ave_algo]['purities'].append(cluster_purity)
 
-    for algo in purities:
-        purities[algo] /= n_trials
-
-    return {algo: (timer.mean_time(), purities[algo]) for algo, timer in timers.items()}
+    return results
 
 # Load and preprocess data
 summet_loader = SUMMET_Loader()
@@ -77,8 +76,6 @@ print('tracklets: ', tracklets.shape)
 print('flat: ', tracklets_flat.shape)
 print('labels: ', len(labels))
 
-K = 6
-# they actually do full tracklet, not subdivided
 K = tracklets.shape[1]
 n_subs = tracklets.shape[1] // K
 assert n_subs * K == tracklets.shape[1]
@@ -95,28 +92,15 @@ for i in range(n_subs):
 U_arr = torch.stack(points, dim=0)
 print('U_arr: ', U_arr.shape, 'device: ', U_arr.device)
 
-# Run benchmark
-n_centers = 100
-results = run_clustering_benchmark(U_arr, U_labels, n_centers, n_trials=1)
-pickle.dump(results, open('tracklet_clustering_results.pkl', 'wb'))
+# Run benchmark with parameter sweep
+n_centers_range = range(5, 105, 5)
+n_trials = 3
+all_results = {}
 
-# Plot results
-plt.figure(figsize=(10, 5))
-algorithms = list(results.keys())
-times = [results[algo][0] for algo in algorithms]
-purities = [results[algo][1] for algo in algorithms]
+for n_centers in tqdm(n_centers_range, desc="Sweeping n_centers"):
+    all_results[n_centers] = run_clustering_benchmark(U_arr, U_labels, n_centers, n_trials=n_trials)
 
-if 'Frechet' in algorithms:
-    algorithms[algorithms.index('Frechet')] = 'Fréchet'
-plt.subplot(1, 2, 1)
-plt.bar(algorithms, times)
-plt.title('Runtime Comparison')
-plt.ylabel('Time (seconds)')
+# Save results
+pickle.dump(all_results, open('tracklet_clustering_results_sweep.pkl', 'wb'))
 
-plt.subplot(1, 2, 2)
-plt.bar(algorithms, purities)
-plt.title('Average Cluster Purity')
-plt.ylabel('Purity')
-
-plt.tight_layout()
-plt.show()
+print("Parameter sweep completed. Results saved as 'tracklet_clustering_results.pkl'.")
