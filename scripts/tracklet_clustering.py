@@ -95,12 +95,14 @@ print('U_arr: ', U_arr.shape, 'device: ', U_arr.device)
 # Run benchmark with parameter sweep
 n_centers_range = range(5, 105, 5)
 n_trials = 3
+# expedited run
+# n_centers_range = range(10, 110, 10); n_trials = 1
 all_results = {}
 
 for n_centers in tqdm(n_centers_range, desc="Sweeping n_centers"):
     all_results[n_centers] = run_clustering_benchmark(U_arr, U_labels, n_centers, n_trials=n_trials)
 
 # Save results
-pickle.dump(all_results, open('tracklet_clustering_results_sweep.pkl', 'wb'))
+pickle.dump(all_results, open('tracklet_clustering_results.pkl', 'wb'))
 
 print("Parameter sweep completed. Results saved as 'tracklet_clustering_results.pkl'.")
