@@ -101,6 +101,8 @@ results = run_clustering_benchmark(U_arr, U_labels, n_centers, n_trials=1)
 # Plot results
 plt.figure(figsize=(10, 5))
 algorithms = list(results.keys())
+if 'Frechet' in algorithms:
+    algorithms[algorithms.index('Frechet')] = 'Fréchet'
 times = [results[algo][0] for algo in algorithms]
 purities = [results[algo][1] for algo in algorithms]
 

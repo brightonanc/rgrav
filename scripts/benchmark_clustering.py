@@ -123,8 +123,12 @@ for param, values in sweep_params.items():
     fig.suptitle(f'Parameter Sweep: {param}')
     
     for algo in all_results[param]:
-        ax1.plot(values, all_results[param][algo]['times'].cpu().numpy(), label=algo)
-        ax2.plot(values, all_results[param][algo]['performances'].cpu().numpy(), label=algo)
+        if 'Frechet' in algo:
+            algo_label = 'Fréchet'
+        else:
+            algo_label = algo
+        ax1.plot(values, all_results[param][algo]['times'].cpu().numpy(), label=algo_label)
+        ax2.plot(values, all_results[param][algo]['performances'].cpu().numpy(), label=algo_label)
     
     ax1.set_ylabel('Time (seconds)')
     ax1.legend()
