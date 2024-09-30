@@ -76,13 +76,21 @@ plt.savefig('plots/purity_heatmap.png', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Visualization 4: Scatter plot of runtime vs cluster purity
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(14, 6))
 scatter = sns.scatterplot(x='runtime', y='purity', hue='algorithm', size='n_clusters', data=df, sizes=(20, 200), palette='Set2')
 plt.title('Runtime vs Cluster Purity')
 plt.xlabel('Runtime (seconds)')
 plt.ylabel('Cluster Purity')
 plt.xscale('log')
-plt.legend(title='Algorithm', bbox_to_anchor=(1.05, 1), loc='upper left')
+legend = plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Modify legend labels
+new_labels = {'algorithm': 'Algorithm', 'n_clusters': '# of Clusters'}
+for text in legend.get_texts():
+    for key, value in new_labels.items():
+        if text.get_text() == key:
+            text.set_text(value)
+
 for line in scatter.lines:
     line.set_alpha(0.7)
 plt.tight_layout()
