@@ -85,7 +85,7 @@ plt.xscale('log')
 legend = plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 
 # Modify legend labels
-new_labels = {'algorithm': 'Algorithm', 'n_clusters': '# of Clusters'}
+new_labels = {'algorithm': 'Algorithm', 'n_clusters': '\n\n# of Means', 'Frechet': 'Fréchet'}
 for text in legend.get_texts():
     for key, value in new_labels.items():
         if text.get_text() == key:
