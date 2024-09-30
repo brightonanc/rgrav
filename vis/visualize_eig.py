@@ -34,9 +34,9 @@ def get_polynomial_chebyshev(cons_rounds):
 
 
 if __name__ == '__main__':
-    eps = 1e-20
+    eps = 1e-30
     thresh_level = 0.25
-    x = torch.linspace(1e-5, 1, 512).double()
+    x = torch.linspace(1e-5, 1, 2048).double()
     
     # Set up the plot style
     try:
@@ -46,13 +46,18 @@ if __name__ == '__main__':
     sns.set_context("paper", font_scale=1.5)
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-    ns = torch.arange(1, 11)
+    ns = [0, *torch.arange(1, 20, 2)]
+    ns = torch.tensor(ns)
     cmap = plt.cm.viridis
     norm = plt.Normalize(vmin=ns.min(), vmax=ns.max())
 
     for n in ns:
-        power_vals = get_polynomial_power(n)(x).abs()
-        chebyshev_vals = get_polynomial_chebyshev(n)(x).abs()
+        if n > 0:
+            power_vals = get_polynomial_power(n)(x).abs()
+            chebyshev_vals = get_polynomial_chebyshev(n)(x).abs()
+        else:
+            power_vals = x
+            chebyshev_vals = x
         power_vals += eps
         chebyshev_vals += eps
         
@@ -62,7 +67,7 @@ if __name__ == '__main__':
 
     for ax in (ax1, ax2):
         ax.set_xlim([x.min(), 1])
-        ax.set_ylim([1e-16, 1])
+        ax.set_ylim([chebyshev_vals.min() / 10, 1])
         ax.set_yscale('log')
         ax.axvline(x=thresh_level, color='red', linestyle='--', alpha=0.7)
         ax.set_xlabel('x')
