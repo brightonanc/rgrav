@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -71,11 +72,47 @@ if __name__ == '__main__':
     ax1.set_title('Power Method')
     ax2.set_title('Chebyshev Recursion')
 
-    # Add a colorbar
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-    # cbar = fig.colorbar(sm, ax=[ax1, ax2], label='n', aspect=30)
-    # cbar.set_ticks(ns)
+    thresh_level = 0.25
+    cdf_min = 1e-30
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    n_eig = 1000
+    eig_low = torch.linspace(0, thresh_level, n_eig)
+    eig_high = torch.linspace(0.9, 1, n_eig)
+    eig_low = torch.rand(n_eig) * thresh_level
+    eig_high = 1 - torch.rand(n_eig) * .01
+    eigs = torch.cat((eig_low, eig_high))
+    eigs = eig_low
+    eigs = torch.linspace(0, thresh_level, 1000)
+
+    def cdf(eigs):
+        xx = torch.linspace(cdf_min, 1, 1000)
+        xx = torch.from_numpy(np.geomspace(cdf_min, 1, 1000))
+        yy = [torch.sum(eigs < x) / eigs.numel() for x in xx]
+        return xx, yy
+
+    # even order come down, odd order come up
+    ns = [0, *torch.arange(1, 20, 2)]
+    ns = torch.tensor(ns)
+    cmap = plt.cm.viridis
+    norm = plt.Normalize(vmin=ns.min(), vmax=ns.max())
+    for i, n in enumerate(ns):
+        if n > 0:
+            eigs_power = get_polynomial_power(n)(eigs)
+            eigs_cheb = get_polynomial_chebyshev(n)(eigs)
+        else:
+            eigs_power = eigs
+            eigs_cheb = eigs
+        power_xx, power_yy = cdf(eigs_power)
+        cheb_xx, cheb_yy = cdf(eigs_cheb)
+        ax1.plot(power_xx, power_yy, c=cmap(norm(n)))
+        ax2.plot(cheb_xx, cheb_yy, c=cmap(norm(n)))
+
+    for i in range(2):
+        plt.subplot(1, 2, i+1)
+        plt.xlim([cdf_min, 1.0])
+        plt.axvline(x=thresh_level, color='red', linestyle='--', alpha=0.7)
+        plt.semilogx()
+        # plt.semilogy()
 
     plt.tight_layout()
     plt.show()
