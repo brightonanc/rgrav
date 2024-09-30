@@ -55,9 +55,8 @@ if __name__ == '__main__':
     })
     sns.set_context("paper", font_scale=1.5)
     
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
     ns = torch.arange(1, 21, 2)
-    # ns = torch.arange(1, 21)
     cmap = plt.cm.viridis
     norm = plt.Normalize(vmin=ns.min(), vmax=ns.max())
 
@@ -68,8 +67,8 @@ if __name__ == '__main__':
         chebyshev_vals += eps
         
         color = cmap(norm(n))
-        ax1.plot(x, power_vals, c=color, label=f'n={n}')
-        ax2.plot(x, chebyshev_vals, c=color, label=f'n={n}')
+        ax1.plot(x, power_vals, c=color)
+        ax2.plot(x, chebyshev_vals, c=color)
 
     for ax in (ax1, ax2):
         ax.set_xlim([x.min(), 1])
@@ -77,36 +76,33 @@ if __name__ == '__main__':
         ax.set_yscale('log')
         ax.axvline(x=thresh_level, color='red', linestyle='--', alpha=0.7)
         ax.set_xlabel('$\lambda$')
-        ax.set_ylabel('$|f_n(\lambda)|$')
         ax.grid(True, which="both", ls="-", alpha=0.2)
 
+    ax1.set_ylabel('$|f_n(\lambda)|$')
     ax1.set_title('Power Method')
     ax2.set_title('Chebyshev Recursion')
+
+    # Add colorbar
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=[ax1, ax2], label='n', aspect=30)
+    cbar.set_ticks(ns)
 
     plt.tight_layout()
     plt.savefig('plots/eig_polynomial.png', dpi=300, bbox_inches='tight')
 
     thresh_level = 0.25
     cdf_min = 1e-30
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
     n_eig = 1000
-    eig_low = torch.linspace(0, thresh_level, n_eig)
-    eig_high = torch.linspace(0.9, 1, n_eig)
-    eig_low = torch.rand(n_eig) * thresh_level
-    eig_high = 1 - torch.rand(n_eig) * .01
-    eigs = torch.cat((eig_low, eig_high))
-    eigs = eig_low
     eigs = torch.linspace(0, thresh_level, 1000)
 
     def cdf(eigs):
-        xx = torch.linspace(cdf_min, 1, 1000)
         xx = torch.from_numpy(np.geomspace(cdf_min, 1, 1000))
         yy = [torch.sum(eigs < x) / eigs.numel() for x in xx]
         return xx, yy
 
-    # even order come down, odd order come up
     ns = torch.arange(1, 21, 2)
-    # ns = torch.arange(1, 21)
     cmap = plt.cm.viridis
     norm = plt.Normalize(vmin=ns.min(), vmax=ns.max())
     for i, n in enumerate(ns):
@@ -114,21 +110,28 @@ if __name__ == '__main__':
         eigs_cheb = get_polynomial_chebyshev(n)(eigs).abs()
         power_xx, power_yy = cdf(eigs_power)
         cheb_xx, cheb_yy = cdf(eigs_cheb)
-        ax1.plot(power_xx, power_yy, c=cmap(norm(n)))
-        ax2.plot(cheb_xx, cheb_yy, c=cmap(norm(n)))
+        color = cmap(norm(n))
+        ax1.plot(power_xx, power_yy, c=color)
+        ax2.plot(cheb_xx, cheb_yy, c=color)
 
     for ax in (ax1, ax2):
         ax.set_xlim([chebyshev_vals.min() / 10, 1.0])
+        # ax.set_xlim([cdf_min, 1.0])
         ax.set_ylim([0, 1])
         ax.set_xscale('log')
         ax.axvline(x=thresh_level, color='red', linestyle='--', alpha=0.7)
         ax.set_xlabel('$\lambda$')
-        ax.set_ylabel(f'CDF( $|f_n(\lambda)|$ )')
         ax.grid(True, which="both", ls="-", alpha=0.2)
 
+    ax1.set_ylabel(f'CDF( $|f_n(\lambda)|$ )')
     ax1.set_title('Power Method')
     ax2.set_title('Chebyshev Recursion')
 
+    # Add colorbar
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=[ax1, ax2], label='n', aspect=30)
+    cbar.set_ticks(ns)
+
     plt.tight_layout()
     plt.savefig('plots/eig_cdf.png', dpi=300, bbox_inches='tight')
-    # plt.show()
