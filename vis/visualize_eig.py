@@ -46,18 +46,13 @@ if __name__ == '__main__':
     sns.set_context("paper", font_scale=1.5)
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-    ns = [0, *torch.arange(1, 20, 2)]
-    ns = torch.tensor(ns)
+    ns = torch.arange(1, 20, 2)
     cmap = plt.cm.viridis
     norm = plt.Normalize(vmin=ns.min(), vmax=ns.max())
 
     for n in ns:
-        if n > 0:
-            power_vals = get_polynomial_power(n)(x).abs()
-            chebyshev_vals = get_polynomial_chebyshev(n)(x).abs()
-        else:
-            power_vals = x
-            chebyshev_vals = x
+        power_vals = get_polynomial_power(n)(x).abs()
+        chebyshev_vals = get_polynomial_chebyshev(n)(x).abs()
         power_vals += eps
         chebyshev_vals += eps
         
@@ -96,17 +91,12 @@ if __name__ == '__main__':
         return xx, yy
 
     # even order come down, odd order come up
-    ns = [0, *torch.arange(1, 20, 2)]
-    ns = torch.tensor(ns)
+    ns = torch.arange(1, 20, 2)
     cmap = plt.cm.viridis
     norm = plt.Normalize(vmin=ns.min(), vmax=ns.max())
     for i, n in enumerate(ns):
-        if n > 0:
-            eigs_power = get_polynomial_power(n)(eigs)
-            eigs_cheb = get_polynomial_chebyshev(n)(eigs)
-        else:
-            eigs_power = eigs
-            eigs_cheb = eigs
+        eigs_power = get_polynomial_power(n)(eigs)
+        eigs_cheb = get_polynomial_chebyshev(n)(eigs)
         power_xx, power_yy = cdf(eigs_power)
         cheb_xx, cheb_yy = cdf(eigs_cheb)
         ax1.plot(power_xx, power_yy, c=cmap(norm(n)))
