@@ -32,8 +32,10 @@ for sweep_type, sweep_data in benchmark_results.items():
                     })
 
 df = pd.DataFrame(data)
-# Set up the plotting style for a more professional look
-plt.style.use('seaborn-whitegrid')
+try:
+    plt.style.use('seaborn-whitegrid')
+except:
+    plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams.update({
     'font.size': 12,
     'axes.labelsize': 14,
