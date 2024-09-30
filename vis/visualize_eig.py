@@ -43,10 +43,21 @@ if __name__ == '__main__':
         plt.style.use('seaborn-whitegrid')
     except:
         plt.style.use('seaborn-v0_8-whitegrid')
+    plt.rcParams.update({
+        'font.size': 12,
+        'axes.labelsize': 14,
+        'axes.titlesize': 16,
+        'xtick.labelsize': 12,
+        'ytick.labelsize': 12,
+        'legend.fontsize': 12,
+        'figure.titlesize': 18,
+        'mathtext.default': 'regular',
+    })
     sns.set_context("paper", font_scale=1.5)
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-    ns = torch.arange(1, 20, 2)
+    ns = torch.arange(1, 21, 2)
+    # ns = torch.arange(1, 21)
     cmap = plt.cm.viridis
     norm = plt.Normalize(vmin=ns.min(), vmax=ns.max())
 
@@ -65,12 +76,15 @@ if __name__ == '__main__':
         ax.set_ylim([chebyshev_vals.min() / 10, 1])
         ax.set_yscale('log')
         ax.axvline(x=thresh_level, color='red', linestyle='--', alpha=0.7)
-        ax.set_xlabel('x')
-        ax.set_ylabel('|f(x)|')
+        ax.set_xlabel('$\lambda$')
+        ax.set_ylabel('$|f_n(\lambda)|$')
         ax.grid(True, which="both", ls="-", alpha=0.2)
 
     ax1.set_title('Power Method')
     ax2.set_title('Chebyshev Recursion')
+
+    plt.tight_layout()
+    plt.savefig('plots/eig_polynomial.png', dpi=300, bbox_inches='tight')
 
     thresh_level = 0.25
     cdf_min = 1e-30
@@ -91,23 +105,30 @@ if __name__ == '__main__':
         return xx, yy
 
     # even order come down, odd order come up
-    ns = torch.arange(1, 20, 2)
+    ns = torch.arange(1, 21, 2)
+    # ns = torch.arange(1, 21)
     cmap = plt.cm.viridis
     norm = plt.Normalize(vmin=ns.min(), vmax=ns.max())
     for i, n in enumerate(ns):
-        eigs_power = get_polynomial_power(n)(eigs)
-        eigs_cheb = get_polynomial_chebyshev(n)(eigs)
+        eigs_power = get_polynomial_power(n)(eigs).abs()
+        eigs_cheb = get_polynomial_chebyshev(n)(eigs).abs()
         power_xx, power_yy = cdf(eigs_power)
         cheb_xx, cheb_yy = cdf(eigs_cheb)
         ax1.plot(power_xx, power_yy, c=cmap(norm(n)))
         ax2.plot(cheb_xx, cheb_yy, c=cmap(norm(n)))
 
-    for i in range(2):
-        plt.subplot(1, 2, i+1)
-        plt.xlim([cdf_min, 1.0])
-        plt.axvline(x=thresh_level, color='red', linestyle='--', alpha=0.7)
-        plt.semilogx()
-        # plt.semilogy()
+    for ax in (ax1, ax2):
+        ax.set_xlim([chebyshev_vals.min() / 10, 1.0])
+        ax.set_ylim([0, 1])
+        ax.set_xscale('log')
+        ax.axvline(x=thresh_level, color='red', linestyle='--', alpha=0.7)
+        ax.set_xlabel('$\lambda$')
+        ax.set_ylabel(f'CDF( $|f_n(\lambda)|$ )')
+        ax.grid(True, which="both", ls="-", alpha=0.2)
+
+    ax1.set_title('Power Method')
+    ax2.set_title('Chebyshev Recursion')
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig('plots/eig_cdf.png', dpi=300, bbox_inches='tight')
+    # plt.show()
