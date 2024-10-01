@@ -26,6 +26,16 @@ summet_loader = SUMMET_Loader()
 tracklets = summet_loader.tracklets
 labels = summet_loader.labels
 tracklets = tracklets.to(device)
+tracklets -= tracklets.mean()
+
+# take only walk tracklets
+label_target = 'walk'
+label_target = 'carry'
+tracklets_trim = []
+for i in range(tracklets.shape[0]):
+    if labels[i] == label_target:
+        tracklets_trim.append(tracklets[i])
+tracklets = torch.stack(tracklets_trim, dim=0)
 
 # trim to a few tracklets for testing
 # tracklets = tracklets[:200]
@@ -49,6 +59,9 @@ P_ave /= n
 
 eigvals, eigvecs = torch.linalg.eigh(P_ave)
 plt.figure()
+plt.subplot(121)
 plt.plot(*cdf(eigvals))
+plt.subplot(122)
+plt.hist(eigvals, bins=100)
 plt.show()
 
