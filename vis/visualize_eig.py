@@ -34,8 +34,9 @@ def get_polynomial_chebyshev(cons_rounds):
 
 
 if __name__ == '__main__':
-    eps = 1e-30
+    eps = 1e-40
     thresh_level = 0.25
+    thresh_level = 0.5
     x = torch.linspace(1e-5, 1, 2048).double()
     
     # Set up the plot style
@@ -57,6 +58,7 @@ if __name__ == '__main__':
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
     ns = torch.arange(1, 21, 2)
+    ns = torch.arange(1, 41, 4)
     cmap = plt.cm.viridis
     norm = plt.Normalize(vmin=ns.min(), vmax=ns.max())
 
@@ -74,21 +76,27 @@ if __name__ == '__main__':
         ax.set_xlim([x.min(), 1])
         ax.set_ylim([chebyshev_vals.min() / 10, 1])
         ax.set_yscale('log')
-        ax.axvline(x=thresh_level, color='red', linestyle='--', alpha=0.7)
+        ax.axvline(x=thresh_level, color='red', linestyle='--', alpha=0.7, label='Noise Threshold ($\\alpha$)')
         ax.set_xlabel('$\lambda$')
         ax.grid(True, which="both", ls="-", alpha=0.2)
 
-    ax1.set_ylabel('$|f_n(\lambda)|$')
+    ax1.set_ylabel('$|f_t(\lambda)|$')
     ax1.set_title('Power Method')
     ax2.set_title('Chebyshev Recursion')
+    ax2.legend()
+
+    # Adjust layout to make space for colorbar
+    plt.tight_layout()
+    fig.subplots_adjust(right=0.90)
 
     # Add colorbar
+    cbar_ax = fig.add_axes([0.93, 0.125, 0.02, 0.795])  # [left, bottom, width, height]
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    cbar = fig.colorbar(sm, ax=[ax1, ax2], label='n', aspect=30)
+    cbar = fig.colorbar(sm, cax=cbar_ax, label='Polynomial Order ($t$)', aspect=30)
     cbar.set_ticks(ns)
+    cbar.ax.invert_yaxis()  # Invert the y-axis of the colorbar
 
-    plt.tight_layout()
     plt.savefig('plots/eig_polynomial.png', dpi=300, bbox_inches='tight')
 
     thresh_level = 0.25
