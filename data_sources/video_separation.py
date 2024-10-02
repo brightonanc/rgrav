@@ -3,6 +3,12 @@
 # can also use change detection dataset from:
 # http://jacarini.dinf.usherbrooke.ca/dataset2012
 
+# SUMMET instructions:
+# 1. download the dataset from: https://www.cs.colostate.edu/~vision/summet/
+# 2. put the dataset in the subfolder "Summet_Data"
+#   a. .mat file should be Summet_Data/smaller_action_labels_2345.mat relative to this file
+# 3. run "python video_separation.py" to make sure everything works
+
 
 import os
 import glob
