@@ -1,3 +1,4 @@
+import os
 import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -42,6 +43,9 @@ plt.rcParams.update({
     'legend.fontsize': 12,
     'figure.titlesize': 18
 })
+
+if not os.path.isdir('plots'):
+    os.mkdir('plots')
 
 # Visualization 1: Box plot of runtimes
 plt.figure(figsize=(10, 6))
