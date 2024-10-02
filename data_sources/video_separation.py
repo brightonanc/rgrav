@@ -3,8 +3,6 @@
 # can also use change detection dataset from:
 # http://jacarini.dinf.usherbrooke.ca/dataset2012
 
-# Alex also has on his OneDrive:
-# https://gtvault-my.sharepoint.com/:f:/g/personal/asf3_gatech_edu/El8WVy1iy5RHsvCRw0lZgkoB6MB9-NhQ6XHDAz4ixKSePQ?e=Yxm6nB
 
 import os
 import glob
