@@ -16,8 +16,8 @@ from data_sources.video_separation import SUMMET_Loader
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def run_clustering_benchmark(U_arr, labels, n_centers, n_trials=3):
-    ave_algos = dict(RGrAv=AsymptoticRGrAv(0.1), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent())
-    dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_distance, Frechet=grassmannian_dist_chordal)
+    ave_algos = dict(RGrAv=AsymptoticRGrAv(0.05), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent(), Power=BPM())
+    dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_distance, Frechet=grassmannian_dist_chordal, Power=grassmannian_dist_chordal)
 
     clustering_algos = dict()
     for ave_algo in ave_algos:
@@ -93,7 +93,7 @@ U_arr = torch.stack(points, dim=0)
 print('U_arr: ', U_arr.shape, 'device: ', U_arr.device)
 
 # Run benchmark with parameter sweep
-n_centers_range = range(5, 105, 5)
+n_centers_range = range(5, 55, 5)
 n_trials = 3
 # expedited run
 # n_centers_range = range(10, 110, 10); n_trials = 1
