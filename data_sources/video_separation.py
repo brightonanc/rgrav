@@ -16,32 +16,44 @@ import h5py
 
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
-
+def find_video_dir(video_name):
+    dataset_dirs = ['dataset2012/dataset', 'dataset2014/dataset']
+    for dataset_dir in dataset_dirs:
+        subdirs = glob.glob(os.path.join(this_dir, dataset_dir, '*'))
+        for subdir in subdirs:
+            video_dir = os.path.join(subdir, video_name)
+            if os.path.exists(os.path.join(video_dir, 'input')) and os.path.exists(os.path.join(video_dir, 'groundtruth')):
+                return video_dir
+    return None
 
 class Loader_CDW():
-    def __init__(self, base_dir):
-        base_dir = os.path.join(this_dir, base_dir)
-        self.data_dir = os.path.join(base_dir, 'input')
-        self.gt_dir = os.path.join(base_dir, 'groundtruth')
-        assert os.path.exists(self.data_dir) and os.path.exists(self.gt_dir), \
-            'highway dataset not found'
+    def __init__(self, video_name):
+        video_dir = find_video_dir(video_name)
+        if video_dir is None:
+            raise ValueError(f'video {video_name} not found')
+        self.data_dir = os.path.join(video_dir, 'input')
+        self.gt_dir = os.path.join(video_dir, 'groundtruth')
 
         self.fnames = sorted(glob.glob(os.path.join(self.data_dir, '*.jpg')))
         self.fnames_gt = sorted(glob.glob(os.path.join(self.gt_dir, '*.png')))
         assert len(self.fnames) == len(self.fnames_gt), \
-            'highway dataset has different number of frames and groundtruths'
+            '{} dataset has different number of frames and groundtruths'.format(video_dir)
         self.n_samples = len(self.fnames)
 
     def load_data(self, frame_idx):
         assert 0 <= frame_idx < self.n_samples, 'frame index out of range'
         img = cv2.imread(self.fnames[frame_idx])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = torch.from_numpy(img)
+        img = img / 255.0
         return img
 
     def load_gt(self, frame_idx):
         assert 0 <= frame_idx < self.n_samples, 'frame index out of range'
         img = cv2.imread(self.fnames_gt[frame_idx])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = torch.from_numpy(img)
+        img = img / 255.0
         return img
 
 class SUMMET_Loader():

@@ -3,7 +3,9 @@
 # i.e., what % of the tracklets in a cluster are of the same class
 
 import torch
-import matplotlib.pyplot as plt
+import pickle
+import numpy as np
+from tqdm import tqdm
 
 from src import *
 from src.util import *
@@ -11,10 +13,54 @@ from src.timing import *
 
 from data_sources.video_separation import SUMMET_Loader
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+def run_clustering_benchmark(U_arr, labels, n_centers, n_trials=3):
+    ave_algos = dict(RGrAv=AsymptoticRGrAv(0.05), Flag=FlagMean(), Frechet=FrechetMeanByGradientDescent(), Power=BPM())
+    dist_funcs = dict(RGrAv=grassmannian_dist_chordal, Flag=flagpole_distance, Frechet=grassmannian_dist_chordal, Power=grassmannian_dist_chordal)
+
+    clustering_algos = dict()
+    for ave_algo in ave_algos:
+        if ave_algo == 'Flag':
+            clustering_algos[ave_algo] = SubspaceClusteringFlagpole()
+        else:
+            clustering_algos[ave_algo] = SubspaceClustering(ave_algos[ave_algo], dist_funcs[ave_algo])
+
+    results = {algo: {'times': [], 'purities': []} for algo in ave_algos}
+
+    for _ in range(n_trials):
+        for ave_algo in ave_algos:
+            start_time = time.time()
+            clusters = clustering_algos[ave_algo].cluster(U_arr, n_centers)
+            end_time = time.time()
+            
+            cluster_assignments = clustering_algos[ave_algo].assign_clusters(U_arr, clusters)
+            
+            cluster_labels = [[] for _ in range(n_centers)]
+            for i, assignment in enumerate(cluster_assignments):
+                cluster_labels[assignment].append(labels[i])
+            
+            cluster_purity = []
+            for cluster in cluster_labels:
+                if len(cluster) == 0:
+                    cluster_purity.append(0)
+                else:
+                    label_counts = {}
+                    for label in cluster:
+                        label_counts[label] = label_counts.get(label, 0) + 1
+                    dominant_label = max(label_counts, key=label_counts.get)
+                    cluster_purity.append(label_counts[dominant_label] / len(cluster))
+            
+            results[ave_algo]['times'].append(end_time - start_time)
+            results[ave_algo]['purities'].append(cluster_purity)
+
+    return results
+
+# Load and preprocess data
 summet_loader = SUMMET_Loader()
 tracklets = summet_loader.tracklets
 labels = summet_loader.labels
+tracklets = tracklets.to(device)
 
 # trim to a few tracklets for testing
 tracklets = tracklets[:200]
@@ -30,7 +76,7 @@ print('tracklets: ', tracklets.shape)
 print('flat: ', tracklets_flat.shape)
 print('labels: ', len(labels))
 
-K = 24
+K = tracklets.shape[1]
 n_subs = tracklets.shape[1] // K
 assert n_subs * K == tracklets.shape[1]
 n_tracklets = tracklets.shape[0]
@@ -44,60 +90,19 @@ for i in range(n_subs):
         points.append(U)
         U_labels.append(labels[j])
 U_arr = torch.stack(points, dim=0)
-print('U_arr: ', U_arr.shape)
+print('U_arr: ', U_arr.shape, 'device: ', U_arr.device)
 
-clustering_algo = SubspaceClustering(AsymptoticRGrAv(0.5))
-n_centers = n_labels
-n_centers = 100
-clusters = clustering_algo.cluster(U_arr, n_centers)
+# Run benchmark with parameter sweep
+n_centers_range = range(5, 55, 5)
+n_trials = 3
+# expedited run
+# n_centers_range = range(10, 110, 10); n_trials = 1
+all_results = {}
 
-print('clusters: ', len(clusters), clusters[0].shape)
+for n_centers in tqdm(n_centers_range, desc="Sweeping n_centers"):
+    all_results[n_centers] = run_clustering_benchmark(U_arr, U_labels, n_centers, n_trials=n_trials)
 
-inter_cluster_dists = []
-for i in range(len(clusters)):
-    inter_cluster_dists.append([])
-    for j in range(len(clusters)):
-        if i != j:
-            inter_cluster_dists[i].append(grassmannian_dist(clusters[i], clusters[j]))
+# Save results
+pickle.dump(all_results, open('tracklet_clustering_results.pkl', 'wb'))
 
-cluster_assignments = clustering_algo.assign_clusters(U_arr, clusters)
-cluster_labels = dict()
-for i in range(len(clusters)):
-    cluster_labels[i] = []
-    for j in range(len(cluster_assignments)):
-        if cluster_assignments[j] == i:
-            cluster_labels[i].append(U_labels[j])
-
-    cluster_labels[i] = set(cluster_labels[i])
-    print('cluster', i, 'label: ', cluster_labels[i])
-
-cluster_purity = []
-for i in range(len(clusters)):
-    # find dominant label
-    label_counts = {}
-    total_count = 0
-    for label in cluster_labels[i]:
-        if label in label_counts:
-            label_counts[label] += 1
-        else:
-            label_counts[label] = 1
-        total_count += 1
-
-    if total_count == 0:
-        cluster_purity.append(0)
-    else:
-        dominant_label = max(label_counts, key=label_counts.get)
-        cluster_purity.append(label_counts[dominant_label] / total_count)
-
-plt.figure()
-plt.suptitle('Average Purity: {:.2f}'.format(sum(cluster_purity) / len(cluster_purity)))
-plt.bar(list(cluster_labels.keys()), cluster_purity)
-
-plt.figure()
-plt.bar(list(cluster_labels.keys()), [len(cluster_labels[i]) for i in cluster_labels.keys()])
-
-plt.figure()
-plt.imshow(inter_cluster_dists)
-plt.colorbar()
-plt.show()
-
+print("Parameter sweep completed. Results saved as 'tracklet_clustering_results.pkl'.")
