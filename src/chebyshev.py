@@ -12,11 +12,18 @@ class AbstractChebyshevMagicNumbers(ABC):
     Magic numbers used in order to iteratively construct a desirable Chebyshev
     polynomial
     """
-    alpha : float
+    alpha : torch.Tensor
+    def __post_init__(self):
+        if not isinstance(self.alpha, torch.Tensor):
+            self.alpha = torch.tensor(self.alpha, dtype=torch.float64)
+        if 0 < len(self.alpha.shape):
+            raise ValueError(f'{self.alpha=} is a non-scalar tensor')
+        if not torch.is_floating_point(self.alpha):
+            raise ValueError(f'{self.alpha.dtype=} is not a float type')
     def __hash__(self):
-        return hash(self.alpha)
+        return hash(self.alpha.item())
     def __eq__(self, other):
-        return self.alpha == other.alpha
+        return self.alpha.item() == other.alpha.item()
     @abstractmethod
     def visualize_polynomial(self, n, *, exact=False, samples=None,
             focus_roots=False, yy=None):
@@ -56,75 +63,146 @@ class ChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
     """
     __hash__ = super.__hash__
     def __post_init__(self):
-        if not isinstance(self.alpha, float):
-            raise ValueError(
-                f'{self.alpha=} is not a float. alpha must be a float to'
-                ' ensure 64-bit type for numerical stability'
-            )
-        lower_lim = 1e-6
-        if lower_lim > self.alpha:
+        super().__post_init__()
+        if 0.99 < self.alpha:
             warnings.warn(
-                'ChebyshevMagicNumbers: Due to numerical instabilities in the'
-                ' computation of magic number a, alpha values less than'
-                f' {lower_lim} are rounded up'
+                'ChebyshevMagicNumbers: For numerical purposes, it is not'
+                ' recommended to set alpha > 0.99 (which is'
+                f' {self.alpha.item()} < 0.99)'
             )
-            self.alpha = lower_lim
+        if self.alpha < torch.finfo(self.alpha.dtype).resolution:
+            _RES = torch.finfo(self.alpha.dtype).resolution
+            warnings.warn(
+                'ChebyshevMagicNumbers: For numerical purposes, it is not'
+                ' recommended to set alpha < FP_RESOLUTION'
+                f' (which is {self.alpha.item()} < {_RES})'
+            )
     def get_root_arr(self, n):
-        n_arr = torch.arange(n)
+        n_arr = torch.arange(n, dtype=self.alpha.dtype)
         root_arr = torch.cos((torch.pi / n) * (n_arr + 0.5))
         root_arr = (root_arr + root_arr[0]) / (1 + root_arr[0])
         root_arr *= self.alpha
         return root_arr
     @staticmethod
     @functools.cache
-    def r0(n):
+    def r0(n, *, dtype):
         if 1 > n:
             raise ValueError('n for r0 must be geq 1')
-        return np.cos(np.pi / (2 * n))
+        return torch.cos(torch.tensor(torch.pi / (2 * n), dtype=dtype))
+        # grows from 0 to 1
+    @classmethod
+    @functools.cache
+    def z_(cls, n, *, dtype):
+        if 1 > n:
+            raise ValueError('n for z_ must be geq 1')
+        return 1 + cls.r0(n, dtype=dtype)
+        # grows from 1 to 2
+    @classmethod
+    @functools.cache
+    def w0(cls, n, *, dtype):
+        if 1 > n:
+            raise ValueError('n for w0 must be geq 1')
+        if 1 == n:
+            return torch.tensor(1., dtype=dtype)
+        z__n = cls.z_(n, dtype=dtype)
+        z__nm1 = cls.z_(n-1, dtype=dtype)
+        return ((z__n / z__nm1)**(n-1)) * z__n
+        # w0(1)=1, then goes from (3/2)+(2**0.5) to 2
+    @classmethod
+    @functools.cache
+    def q_(cls, n, *, dtype):
+        if 1 > n:
+            raise ValueError('n for q_ must be geq 1')
+        return -cls.r0(n, dtype=dtype) / cls.z_(n, dtype=dtype)
+        # decreases from 0 to -0.5
+    @classmethod
+    @functools.cache
+    def diff_q_(cls, n, *, dtype):
+        if 2 > n:
+            raise ValueError('n for diff_q_ must be geq 2')
+        diff = cls.q_(n, dtype=dtype) - cls.q_(n-1, dtype=dtype)
+        if torch.abs(diff) < torch.finfo(dtype).resolution:
+            # Needed for stability as diff decreases O(n^{-3}) and is only ever
+            # multiplied by O(n)
+            diff.fill_(0)
+        return diff
+        # goes from 1-2**0.5 to 0
+    @classmethod
+    @functools.cache
+    def b_pre(cls, n, *, dtype):
+        if 2 > n:
+            raise ValueError('n for b_pre must be geq 2')
+        return (n * cls.diff_q_(n, dtype=dtype)) + cls.q_(n-1, dtype=dtype)
+        # goes from 2(1-2**0.5) to -0.5
+    @classmethod
+    @functools.cache
+    def diff_inv_sq_z_(cls, n, *, dtype):
+        if 2 > n:
+            raise ValueError('n for diff_inv_sq_z_ must be geq 2')
+        term0 = ((1 / cls.z_(n, dtype=dtype)) ** 2)
+        term1 = ((1 / cls.z_(n-1, dtype=dtype)) ** 2)
+        diff = term0 - term1
+        if torch.abs(diff) < torch.finfo(dtype).resolution:
+            # Needed for stability as diff decreases O(n^{-3}) and is only ever
+            # multiplied by O(n)
+            diff.fill_(0)
+        return diff
+        # goes from 5-(4*(2**0.5)) to 0
+    @classmethod
+    @functools.cache
+    def c_pre(cls, n, *, dtype):
+        if 2 > n:
+            raise ValueError('n for c_pre must be geq 2')
+        if 2 == n:
+            return torch.tensor(0, dtype=dtype)
+        term0 = 2 * n * (n-1) * (cls.diff_q_(n, dtype=dtype) ** 2)
+        term1 = -n * cls.diff_inv_sq_z_(n, dtype=dtype)
+        term2 = -((1 / cls.z_(n-1, dtype=dtype)) ** 2)
+        return 0.25 * (term0 + term1 + term2)
+        # goes from 0 to -0.0625
     @functools.cache
     def z(self, n):
-        if 1 > n:
-            raise ValueError('n for z must be geq 1')
-        return (1 + self.r0(n)) / self.alpha
+        return self.z_(n, dtype=self.alpha.dtype) / self.alpha
+        # grows from 1/alpha to 2/alpha
     @functools.cache
     def t(self, n, x=None):
-        if x is None:
-            x = self.z(n) - self.r0(n)
+        if (x is None) and (0 < n):
+            if not torch.isfinite(self.t(n-1)):
+                return self.t(n-1)
+            x = self.z(n) - self.r0(n, dtype=self.alpha.dtype)
         match n:
             case 0:
-                return 1
+                return torch.tensor(1, dtype=self.alpha.dtype)
             case 1:
                 return x
             case _:
                 return (2 * x * self.t(n-1, x=x)) - self.t(n-2, x=x)
     @functools.cache
-    def g(self, n):
-        if 0 == n:
-            return 1
-        return self.t(n) / (self.z(n) ** n)
+    def w1_infty(self):
+        term0 = 2 / self.alpha
+        return 2 / (((term0**0.5) + ((term0-2)**0.5))**2)
     @functools.cache
-    def q(self, n):
+    def w1(self, n):
         if 1 > n:
-            raise ValueError('n for q must be geq 1')
-        return (1 / self.z(n)) * (-self.r0(n))
+            raise ValueError('n for w1 must be geq 1')
+        t_n = self.t(n)
+        t_nm1 = self.t(n-1)
+        if not torch.isfinite(t_n):
+            return self.w1_infty()
+        return self.t(n-1) / self.t(n)
     @functools.cache
     def a(self, n):
         if 1 > n:
             raise ValueError('n for a must be geq 1')
-        upper_lim = 32
-        if n > upper_lim:
-            warnings.warn(
-                'ChebyshevMagicNumbers: Indexing magic number a beyond its'
-                ' numerically stable domain; an approximation will be given'
-                ' from here on'
-            )
-            return self.a(upper_lim)
-        return 2 * (self.g(n-1) / self.g(n))
+        #return 2 * (self.g(n-1) / self.g(n))
+        w0 = self.w0(n, dtype=self.alpha.dtype)
+        w1 = self.w1(n)
+        return 2 * w0 * (1 / self.alpha) * w1
     @functools.cache
     def b(self, n):
         if 2 > n:
             raise ValueError('n for b must be geq 2')
-        return (n * self.q(n)) - ((n-1) * self.q(n-1))
+        return self.alpha * self.b_pre(n, dtype=self.alpha.dtype)
     @functools.cache
     def bp(self, n):
         return self.a(n) * self.b(n)
@@ -132,19 +210,16 @@ class ChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
     def c(self, n):
         if 2 > n:
             raise ValueError('n for c must be geq 2')
-        term0 = 2 * n * (n-1) * ((self.q(n) - self.q(n-1)) ** 2)
-        term1 = n * ((1 / self.z(n)) ** 2)
-        if 2 < n:
-            term1 -= (n-1) * ((1 / self.z(n-1)) ** 2)
-        c = 0.25 * self.a(n-1) * (term0 - term1)
-        if 2 == n:
-            c /= 2
+        c_pre = self.c_pre(n, dtype=self.alpha.dtype)
+        c = self.a(n-1) * (self.alpha ** 2) * c_pre
         return c
     @functools.cache
     def cp(self, n):
         return self.a(n) * self.c(n)
     def visualize_polynomial(self, n, *, which_poly='exact', samples=None,
             focus_roots=False, yy=None):
+        dtype = self.alpha.dtype
+        alpha = self.alpha.to(dtype)
         options_which_poly = ('exact', 'iterated', 'both')
         if which_poly not in options_which_poly:
             raise ValueError(
@@ -155,10 +230,10 @@ class ChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
         plot_iter = which_poly in ('iterated', 'both')
         import matplotlib.pyplot as plt
         if yy is None:
-            yy = torch.linspace(0, 1, 8192)
+            yy = torch.linspace(0, 1, 8192, dtype=dtype)
             if focus_roots:
-                yy *= self.alpha
-        yy = torch.cat((torch.tensor([self.alpha]), yy))
+                yy *= alpha
+        yy = torch.cat((alpha[None], yy))
         if samples is not None:
             yy = torch.cat((samples, yy))
         poly = torch.ones_like(yy)
@@ -204,24 +279,29 @@ class ChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
         if samples is not None:
             plt.subplot(1, 2, 1)
         if plot_exact:
-            plt.plot(yy, poly_exact, 'b', label='exact')
+            plt.plot(yy, poly_exact, 'b', alpha=0.5, label='exact')
             plt.plot(
-                [0, self.alpha, self.alpha],
+                [0, alpha, alpha],
                 [f_exact_alpha, f_exact_alpha, 0],
-                'b--'
+                'b--',
+                alpha=0.5,
             )
             if samples is not None:
-                plt.plot(samples, f_exact_samples, 'bx')
+                plt.plot(samples, f_exact_samples, 'bx', alpha=0.5)
         if plot_iter:
-            plt.plot(yy, poly_iter, 'r', label='iterated')
+            plt.plot(yy, poly_iter, 'r', alpha=0.5, label='iterated')
             plt.plot(
-                [0, self.alpha, self.alpha],
+                [0, alpha, alpha],
                 [f_iter_alpha, f_iter_alpha, 0],
-                'r--'
+                'r--',
+                alpha=0.5,
             )
             if samples is not None:
-                plt.plot(samples, f_iter_samples, 'rx')
-        plt.title(fr'$|f_n(y)|$ for $\alpha={self.alpha}$')
+                plt.plot(samples, f_iter_samples, 'rx', alpha=0.5)
+        plt.title(
+            fr'$|f_n(y)|$ for $\alpha={self.alpha.item()}$'
+            f' (dtype={self.alpha.dtype})'
+        )
         plt.xlabel(r'$y$')
         plt.xlim([yy[0], yy[-1]])
         plt.ylim([0, max_poly])
@@ -230,13 +310,17 @@ class ChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
             plt.subplot(1, 2, 2)
             max_new_samples = 0.
             if plot_exact:
-                new_samples_exact = torch.cat(
-                    (torch.tensor([0.]), f_exact_samples.sort().values)
-                )
+                new_samples_exact = torch.cat((
+                    torch.tensor([0.], dtype=dtype),
+                    f_exact_samples.sort().values
+                ))
                 plt.plot(
                     new_samples_exact,
-                    torch.linspace(0, 1, new_samples_exact.numel()),
+                    torch.linspace(
+                        0, 1, new_samples_exact.numel(), dtype=dtype
+                    ),
                     'b-x',
+                    alpha=0.5,
                     label='exact'
                 )
                 max_new_samples = max(
@@ -244,13 +328,17 @@ class ChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
                     new_samples_exact[-1].item()
                 )
             if plot_iter:
-                new_samples_iter = torch.cat(
-                    (torch.tensor([0.]), f_iter_samples.sort().values)
-                )
+                new_samples_iter = torch.cat((
+                    torch.tensor([0.], dtype=dtype),
+                    f_iter_samples.sort().values
+                ))
                 plt.plot(
                     new_samples_iter,
-                    torch.linspace(0, 1, new_samples_iter.numel()),
+                    torch.linspace(
+                        0, 1, new_samples_iter.numel(), dtype=dtype
+                    ),
                     'r-x',
+                    alpha=0.5,
                     label='iterated'
                 )
                 max_new_samples = max(
@@ -291,7 +379,7 @@ class BalancedChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
     """
     __hash__ = super.__hash__
     def get_root_arr(self, n):
-        n_arr = torch.arange(n)
+        n_arr = torch.arange(n, dtype=self.alpha.dtype)
         root_arr = torch.cos((torch.pi / n) * (n_arr + 0.5))
         root_arr *= self.alpha
         return root_arr
@@ -300,7 +388,7 @@ class BalancedChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
         if 1 > n:
             raise ValueError('n for h must be geq 1')
         if 1 == n:
-            return self.alpha
+            return self.alpha.clone()
         return 1 / ((2 / self.alpha) - self.h(n-1))
     @functools.cache
     def a(self, n):
@@ -317,6 +405,8 @@ class BalancedChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
         return self.a(n) * self.c(n)
     def visualize_polynomial(self, n, *, which_poly='exact', samples=None,
             focus_roots=False, yy=None):
+        dtype = self.alpha.dtype
+        alpha = self.alpha.to(dtype)
         options_which_poly = ('exact', 'iterated', 'both')
         if which_poly not in options_which_poly:
             raise ValueError(
@@ -327,10 +417,10 @@ class BalancedChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
         plot_iter = which_poly in ('iterated', 'both')
         import matplotlib.pyplot as plt
         if yy is None:
-            yy = torch.linspace(-1, 1, 8192)
+            yy = torch.linspace(-1, 1, 8192, dtype=dtype)
             if focus_roots:
-                yy *= self.alpha
-        yy = torch.cat((torch.tensor([self.alpha]), yy))
+                yy *= alpha
+        yy = torch.cat((alpha[None], yy))
         if samples is not None:
             yy = torch.cat((samples, yy))
         poly = torch.ones_like(yy)
@@ -347,8 +437,6 @@ class BalancedChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
                 else:
                     a = self.a(i)
                     c = self.c(i)
-                    print(f'{a=}')
-                    print(f'{c=}')
                     next_poly_iter = a * (
                         (yy * poly_iter) + (c * prev_poly_iter)
                     )
@@ -376,24 +464,29 @@ class BalancedChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
         if samples is not None:
             plt.subplot(1, 2, 1)
         if plot_exact:
-            plt.plot(yy, poly_exact, 'b', label='exact')
+            plt.plot(yy, poly_exact, 'b', alpha=0.5, label='exact')
             plt.plot(
-                [-self.alpha, self.alpha, self.alpha],
+                [-alpha, alpha, alpha],
                 [f_exact_alpha, f_exact_alpha, 0],
-                'b--'
+                'b--',
+                alpha=0.5,
             )
             if samples is not None:
-                plt.plot(samples, f_exact_samples, 'bx')
+                plt.plot(samples, f_exact_samples, 'bx', alpha=0.5)
         if plot_iter:
-            plt.plot(yy, poly_iter, 'r', label='iterated')
+            plt.plot(yy, poly_iter, 'r', alpha=0.5, label='iterated')
             plt.plot(
-                [-self.alpha, self.alpha, self.alpha],
+                [-alpha, alpha, alpha],
                 [f_iter_alpha, f_iter_alpha, 0],
-                'r--'
+                'r--',
+                alpha=0.5,
             )
             if samples is not None:
-                plt.plot(samples, f_iter_samples, 'rx')
-        plt.title(fr'$|f_n(y)|$ for $\alpha={self.alpha}$')
+                plt.plot(samples, f_iter_samples, 'rx', alpha=0.5)
+        plt.title(
+            fr'$|f_n(y)|$ for $\alpha={self.alpha.item()}$'
+            f' (dtype={self.alpha.dtype})'
+        )
         plt.xlabel(r'$y$')
         plt.xlim([yy[0], yy[-1]])
         plt.ylim([0, max_poly])
@@ -402,13 +495,17 @@ class BalancedChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
             plt.subplot(1, 2, 2)
             max_new_samples = 0.
             if plot_exact:
-                new_samples_exact = torch.cat(
-                    (torch.tensor([0.]), f_exact_samples.sort().values)
-                )
+                new_samples_exact = torch.cat((
+                    torch.tensor([0.], dtype=dtype),
+                    f_exact_samples.sort().values
+                ))
                 plt.plot(
                     new_samples_exact,
-                    torch.linspace(0, 1, new_samples_exact.numel()),
+                    torch.linspace(
+                        0, 1, new_samples_exact.numel(), dtype=dtype
+                    ),
                     'b-x',
+                    alpha=0.5,
                     label='exact'
                 )
                 max_new_samples = max(
@@ -416,13 +513,17 @@ class BalancedChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
                     new_samples_exact[-1].item()
                 )
             if plot_iter:
-                new_samples_iter = torch.cat(
-                    (torch.tensor([0.]), f_iter_samples.sort().values)
-                )
+                new_samples_iter = torch.cat((
+                    torch.tensor([0.], dtype=dtype),
+                    f_iter_samples.sort().values
+                ))
                 plt.plot(
                     new_samples_iter,
-                    torch.linspace(0, 1, new_samples_iter.numel()),
+                    torch.linspace(
+                        0, 1, new_samples_iter.numel(), dtype=dtype
+                    ),
                     'r-x',
+                    alpha=0.5,
                     label='iterated'
                 )
                 max_new_samples = max(
@@ -437,3 +538,4 @@ class BalancedChebyshevMagicNumbers(AbstractChebyshevMagicNumbers):
             plt.ylim([0, 1])
             plt.legend()
         plt.show()
+

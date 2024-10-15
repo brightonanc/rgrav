@@ -49,7 +49,7 @@ def main():
 
     num_iter = 32
 
-    flag_S_experiment = True
+    flag_S_experiment = False
     if flag_S_experiment:
         kwargs = dict(
             ortho_scheduler=lambda x: x in [0,1,2,3,4,6,8,12,16],
