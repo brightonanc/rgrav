@@ -11,7 +11,7 @@ from . import util
 class FiniteRGrAv(GrassmannianAveragingAlgorithm):
 
     def __init__(self, alpha, num_iter, zero_first=False, mode='qr-stable',
-             ortho_scheduler=None):
+                ortho_scheduler=None, use_S=None):
         super().__init__()
         self.root_arr = ChebyshevMagicNumbers(alpha).get_root_arr(num_iter)
         self.num_iter = num_iter
@@ -20,12 +20,21 @@ class FiniteRGrAv(GrassmannianAveragingAlgorithm):
         self.mode = mode
         if ortho_scheduler is None:
             ortho_scheduler = lambda it: True
+            if use_S is None:
+                use_S = False
         self.ortho_scheduler = ortho_scheduler
+        if use_S is None:
+            use_S = True
+        self.use_S = use_S
 
     def algo_iters(self, U_arr):
+        M, N, K = U_arr.shape
         it = 0
         iter_frame = SimpleNamespace()
         U = self.get_U0(U_arr)
+        if self.use_S:
+            S = U_arr.new_zeros(K, K)
+            S[range(K), range(K)] = 1
         iter_frame.U = U
         iter_frame.within_num_iter = True
         yield iter_frame
@@ -45,9 +54,15 @@ class FiniteRGrAv(GrassmannianAveragingAlgorithm):
             Z_hat = (fac0 * A.mean(0)) - (fac1 * U)
             do_ortho = self.ortho_scheduler(it)
             if do_ortho:
-                U = util.get_orthobasis(Z_hat, mode=self.mode)
+                if self.use_S:
+                    U, S= util.get_orthobasis(Z_hat, mode=self.mode, return_S=True)
+                else:
+                    U = util.get_orthobasis(Z_hat, mode=self.mode)
             else:
-                U = Z_hat
+                if self.use_S:
+                    U = Z_hat @ S
+                else:
+                    U = Z_hat
             iter_frame.U = U
             iter_frame.do_ortho = do_ortho
             iter_frame.within_num_iter = within_num_iter
@@ -56,18 +71,28 @@ class FiniteRGrAv(GrassmannianAveragingAlgorithm):
 
 class AsymptoticRGrAv(GrassmannianAveragingAlgorithm):
 
-    def __init__(self, alpha, mode='qr-stable', ortho_scheduler=None):
+    def __init__(self, alpha, mode='qr-stable', ortho_scheduler=None,
+                use_S=None):
         super().__init__()
         self.cmn = ChebyshevMagicNumbers(alpha)
         self.mode = mode
         if ortho_scheduler is None:
             ortho_scheduler = lambda it: True
+            if use_S is None:
+                use_S = False
         self.ortho_scheduler = ortho_scheduler
+        if use_S is None:
+            use_S = True
+        self.use_S = use_S
 
     def algo_iters(self, U_arr):
+        M, N, K = U_arr.shape
         it = 0
         iter_frame = SimpleNamespace()
         U = self.get_U0(U_arr)
+        if self.use_S:
+            S = U_arr.new_zeros(K, K)
+            S[range(K), range(K)] = 1
         iter_frame.U = U
         yield iter_frame
         while True:
@@ -84,13 +109,25 @@ class AsymptoticRGrAv(GrassmannianAveragingAlgorithm):
             do_ortho = self.ortho_scheduler(it)
             prev_U = U
             if do_ortho:
-                U, (prev_U,) = util.get_orthobasis(
-                    Z_hat,
-                    mode=self.mode,
-                    others_X=(prev_U,)
-                )
+                if self.use_S:
+                    U, (prev_U,), S = util.get_orthobasis(
+                        Z_hat,
+                        mode=self.mode,
+                        others_X=(prev_U,),
+                        return_S=True,
+                    )
+                else:
+                    U, (prev_U,) = util.get_orthobasis(
+                        Z_hat,
+                        mode=self.mode,
+                        others_X=(prev_U,),
+                    )
             else:
-                U = Z_hat
+                if self.use_S:
+                    U = Z_hat @ S
+                    prev_U = prev_U @ S
+                else:
+                    U = Z_hat
             iter_frame.U = U
             iter_frame.do_ortho = do_ortho
             yield iter_frame
@@ -99,7 +136,7 @@ class AsymptoticRGrAv(GrassmannianAveragingAlgorithm):
 class FiniteDRGrAv(DecentralizedConsensusAlgorithm):
 
     def __init__(self, alpha, num_iter, consensus, zero_first=False,
-                mode='qr-stable', ortho_scheduler=None):
+                mode='qr-stable', ortho_scheduler=None, use_S=None):
         super().__init__(consensus)
         self.root_arr = ChebyshevMagicNumbers(alpha).get_root_arr(num_iter)
         self.num_iter = num_iter
@@ -108,12 +145,21 @@ class FiniteDRGrAv(DecentralizedConsensusAlgorithm):
         self.mode = mode
         if ortho_scheduler is None:
             ortho_scheduler = lambda it: True
+            if use_S is None:
+                use_S = False
         self.ortho_scheduler = ortho_scheduler
+        if use_S is None:
+            use_S = True
+        self.use_S = use_S
 
     def algo_iters(self, U_arr):
+        M, N, K = U_arr.shape
         it = 0
         iter_frame = SimpleNamespace()
         U = self.get_U0(U_arr)
+        if self.use_S:
+            S = U_arr.new_zeros(M, K, K)
+            S[:, range(K), range(K)] = 1
         iter_frame.U = U
         iter_frame.within_num_iter = True
         yield iter_frame
@@ -139,9 +185,22 @@ class FiniteDRGrAv(DecentralizedConsensusAlgorithm):
             Z_hat = self.consensus(Z)
             do_ortho = self.ortho_scheduler(it)
             if do_ortho:
-                U = util.get_orthobasis(Z_hat, mode=self.mode)
+                if self.use_S:
+                    U, S = util.get_orthobasis(
+                        Z_hat,
+                        mode=self.mode,
+                        return_S=True
+                    )
+                else:
+                    U = util.get_orthobasis(
+                        Z_hat,
+                        mode=self.mode,
+                    )
             else:
-                U = Z_hat
+                if self.use_S:
+                    U = Z_hat @ S
+                else:
+                    U = Z_hat
             prev_Y = Y
             iter_frame.U = U
             iter_frame.do_ortho = do_ortho
@@ -152,18 +211,27 @@ class FiniteDRGrAv(DecentralizedConsensusAlgorithm):
 class AsymptoticDRGrAv(DecentralizedConsensusAlgorithm):
 
     def __init__(self, alpha, consensus, mode='qr-stable',
-                ortho_scheduler=None):
+                ortho_scheduler=None, use_S=None):
         super().__init__(consensus)
         self.cmn = ChebyshevMagicNumbers(alpha)
         self.mode = mode
         if ortho_scheduler is None:
             ortho_scheduler = lambda it: True
+            if use_S is None:
+                use_S = False
         self.ortho_scheduler = ortho_scheduler
+        if use_S is None:
+            use_S = True
+        self.use_S = use_S
 
     def algo_iters(self, U_arr):
+        M, N, K = U_arr.shape
         it = 0
         iter_frame = SimpleNamespace()
         U = self.get_U0(U_arr)
+        if self.use_S:
+            S = U_arr.new_zeros(M, K, K)
+            S[:, range(K), range(K)] = 1
         iter_frame.U = U
         yield iter_frame
         while True:
@@ -182,13 +250,25 @@ class AsymptoticDRGrAv(DecentralizedConsensusAlgorithm):
             do_ortho = self.ortho_scheduler(it)
             prev_U = U
             if do_ortho:
-                U, (prev_U,) = util.get_orthobasis(
-                    Z_hat,
-                    mode=self.mode,
-                    others_X=(prev_U,)
-                )
+                if self.use_S:
+                    U, (prev_U,), S = util.get_orthobasis(
+                        Z_hat,
+                        mode=self.mode,
+                        others_X=(prev_U,),
+                        return_S=True,
+                    )
+                else:
+                    U, (prev_U,) = util.get_orthobasis(
+                        Z_hat,
+                        mode=self.mode,
+                        others_X=(prev_U,),
+                    )
             else:
-                U = Z_hat
+                if self.use_S:
+                    U = Z_hat @ S
+                    prev_U = prev_U @ S
+                else:
+                    U = Z_hat
             prev_Y = Y
             iter_frame.U = U
             iter_frame.do_ortho = do_ortho

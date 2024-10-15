@@ -18,7 +18,7 @@ def main():
     np.random.seed(seed)
     hc_dim = 3
     M = 2**hc_dim
-    N = 43
+    N = 200
     K = 12
     radius_ratio = 0.9
 
@@ -32,6 +32,13 @@ def main():
     eigval, eigvec = torch.linalg.eigh(P_avg)
     U_the = eigvec[:, -K:]
 
+    plt.plot(eigval, (1+torch.arange(eigval.numel()))/eigval.numel(), '-x')
+    plt.plot([eigval[-K]]*2, [0, 1], '--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.title('CDF of eigenvalues')
+    plt.show()
+
     consensus = ChebyshevConsensus(
         HypercubeGraph.get_positive_optimal_lapl_based_comm_W(hc_dim),
         cons_rounds = 8,
@@ -41,6 +48,15 @@ def main():
     alpha = alpha_ideal
 
     num_iter = 32
+
+    flag_S_experiment = True
+    if flag_S_experiment:
+        kwargs = dict(
+            ortho_scheduler=lambda x: x in [0,1,2,3,4,6,8,12,16],
+            use_S=True,
+        )
+    else:
+        kwargs = {}
 
     # ============================== Centralized ==============================
     # BPM
@@ -56,11 +72,11 @@ def main():
     pmfd_loss_hist = []
     pmfd_gen = pmfd.algo_iters(U_arr)
     # FiniteRGrAv
-    frgrav = FiniteRGrAv(alpha, num_iter)
+    frgrav = FiniteRGrAv(alpha, num_iter, **kwargs)
     frgrav_loss_hist = []
     frgrav_gen = frgrav.algo_iters(U_arr)
     # AsymptoticRGrAv
-    argrav = AsymptoticRGrAv(alpha)
+    argrav = AsymptoticRGrAv(alpha, **kwargs)
     argrav_loss_hist = []
     argrav_gen = argrav.algo_iters(U_arr)
     # ============================= Decentralized =============================
@@ -77,11 +93,11 @@ def main():
     dpmfd_loss_hist = []
     dpmfd_gen = dpmfd.algo_iters(U_arr)
     # FiniteDRGrAv
-    fdrgrav = FiniteDRGrAv(alpha, num_iter, consensus)
+    fdrgrav = FiniteDRGrAv(alpha, num_iter, consensus, **kwargs)
     fdrgrav_loss_hist = []
     fdrgrav_gen = fdrgrav.algo_iters(U_arr)
     # AsymptoticDRGrAv
-    adrgrav = AsymptoticDRGrAv(alpha, consensus)
+    adrgrav = AsymptoticDRGrAv(alpha, consensus, **kwargs)
     adrgrav_loss_hist = []
     adrgrav_gen = adrgrav.algo_iters(U_arr)
 
@@ -112,13 +128,13 @@ def main():
         frgrav_loss_hist.append(
             util.grassmannian_dist(frgrav_iter_frame.U, U_the)**2
         )
-        plt.semilogy(frgrav_loss_hist, '-x', label='frgrav')
+        plt.semilogy(frgrav_loss_hist, '--x', label='frgrav')
         # AsymptoticRGrAv
         argrav_iter_frame = next(argrav_gen)
         argrav_loss_hist.append(
             util.grassmannian_dist(argrav_iter_frame.U, U_the)**2
         )
-        plt.semilogy(argrav_loss_hist, '-x', label='argrav')
+        plt.semilogy(argrav_loss_hist, '--x', label='argrav')
         # =========================== Decentralized ===========================
         # DBPM
         dbpm_iter_frame = next(dbpm_gen)
@@ -143,13 +159,13 @@ def main():
         fdrgrav_loss_hist.append(
             (util.grassmannian_dist(fdrgrav_iter_frame.U, U_the)**2).mean(0)
         )
-        plt.semilogy(fdrgrav_loss_hist, '-x', label='fdrgrav')
+        plt.semilogy(fdrgrav_loss_hist, '--x', label='fdrgrav')
         # AsymptoticDRGrAv
         adrgrav_iter_frame = next(adrgrav_gen)
         adrgrav_loss_hist.append(
             (util.grassmannian_dist(adrgrav_iter_frame.U, U_the)**2).mean(0)
         )
-        plt.semilogy(adrgrav_loss_hist, '-x', label='adrgrav')
+        plt.semilogy(adrgrav_loss_hist, '--x', label='adrgrav')
 
         plt.legend()
         plt.pause(0.01)

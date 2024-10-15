@@ -1,8 +1,7 @@
 import torch
 from types import SimpleNamespace
 
-from .algorithm_base import GrassmannianAveragingAlgorithm, \
-        DecentralizedConsensusAlgorithm
+from .algorithm_base import DecentralizedConsensusAlgorithm
 from .consensus import FastMixDeEPCA
 from . import util
 
@@ -33,8 +32,9 @@ class DeEPCA(DecentralizedConsensusAlgorithm):
             S += tmp - AW
             AW = tmp
             S = self.consensus(S)
-            W = torch.linalg.qr(S).Q
-            W = self._sign_adjust(W, W0)
+            #W = torch.linalg.qr(S).Q
+            #W = self._sign_adjust(W, W0)
+            W = util.get_orthobasis(S, mode='qr-stable')
             iter_frame.U = W
             yield iter_frame
 

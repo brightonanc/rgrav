@@ -64,6 +64,7 @@ class GrassmannianAveragingAlgorithm(ABC):
 
     def set_U0(self, U0):
         self.U0 = U0
+        return self
 
     def get_U0(self, U_arr):
         if self.U0 is None:

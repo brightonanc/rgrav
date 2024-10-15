@@ -6,6 +6,9 @@ from .frechet_mean_by_gd import *
 from .block_power_method import *
 from .power_method_plus_frequent_directions import *
 from .deepca import *
+from .sarlette_sepulchre import *
+from .dprgd_dprgt import *
+from .gossip import *
 from .rgrav import *
 from .grasta import *
 from .flag_mean import *

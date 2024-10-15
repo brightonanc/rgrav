@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 def adjacency_matrix_from_edges(edges, num_vertices=None, dtype=None, dev=None):
     """
@@ -32,7 +33,7 @@ def adjacency_matrix_from_edges(edges, num_vertices=None, dtype=None, dev=None):
 
 class StarGraph:
     @staticmethod
-    def _get_edges(num_vertices):
+    def get_edges(num_vertices):
         """
         Returns the edges of a star graph
 
@@ -66,7 +67,7 @@ class StarGraph:
             laplacian-based communication matrices.
         """
         A = adjacency_matrix_from_edges(
-            cls._get_edges(num_vertices),
+            cls.get_edges(num_vertices),
             dtype=dtype,
             dev=dev,
         )
@@ -90,7 +91,7 @@ class StarGraph:
 
 class HypercubeGraph:
     @staticmethod
-    def _get_edges(hc_dim):
+    def get_edges(hc_dim):
         """
         Returns the edges of a hypercube graph
 
@@ -112,6 +113,13 @@ class HypercubeGraph:
                     edges.append((i, i | bitmask))
         return tuple(edges)
     @classmethod
+    def get_adjacency(cls, hc_dim, dtype=None, dev=None):
+        return adjacency_matrix_from_edges(
+            cls.get_edges(hc_dim),
+            dtype=dtype,
+            dev=dev,
+        )
+    @classmethod
     def get_lapl_based_comm_W(cls, hc_dim, r, dtype=None, dev=None):
         """
         Returns a laplacian-based communication matrix W
@@ -130,11 +138,7 @@ class HypercubeGraph:
             where d_max is the maximal degree of the graph and L is the graph
             laplacian
         """
-        A = adjacency_matrix_from_edges(
-            cls._get_edges(hc_dim),
-            dtype=dtype,
-            dev=dev,
-        )
+        A = cls.get_adjacency(hc_dim, dtype=dtype, dev=dev)
         d = A.sum(-1)
         d_max = d.max()
         D = d.diag_embed()
@@ -189,4 +193,106 @@ class HypercubeGraph:
         """
         r = 2.
         return cls.get_lapl_based_comm_W(hc_dim, r=r, dtype=dtype, dev=dev)
+
+
+class CycleGraph:
+    @staticmethod
+    def get_edges(M):
+        """
+        Returns the edges of a cycle graph
+
+        Parameters
+        ----------
+        M : int
+            The number of vertices
+
+        Returns
+        -------
+        edges : tuple[tuple[int, int]]
+        """
+        return tuple([(m, (m+1)%M) for m in range(M)])
+    @classmethod
+    def get_adjacency(cls, M, dtype=None, dev=None):
+        return adjacency_matrix_from_edges(
+            cls.get_edges(M),
+            dtype=dtype,
+            dev=dev,
+        )
+    @classmethod
+    def get_lapl_based_comm_W(cls, M, r, dtype=None, dev=None):
+        """
+        Returns a laplacian-based communication matrix W
+
+        Parameters
+        ----------
+        M : int
+            The number of vertices
+
+        Returns
+        -------
+        W : tensor[2**hc_dim, 2**hc_dim]
+            A laplacian-based communication matrix W defined as follows
+                I - ((1/(r*d_max)) * L)
+            where d_max is the maximal degree of the graph and L is the graph
+            laplacian
+        """
+        A = cls.get_adjacency(M, dtype=dtype, dev=dev)
+        d = A.sum(-1)
+        d_max = d.max()
+        D = d.diag_embed()
+        L = D - A
+        I = torch.eye(A.shape[-1], dtype=dtype, device=dev)
+        W = I - ((1/(r*d_max)) * L)
+        return W
+    @classmethod
+    def get_optimal_lapl_based_comm_W(cls, M, dtype=None, dev=None):
+        """
+        Returns the optimal laplacian-based communication matrix W
+
+        Parameters
+        ----------
+        M : int
+            The number of vertices
+
+        Returns
+        -------
+        W : tensor[2**hc_dim, 2**hc_dim]
+            The optimal laplacian-based communication matrix W. W is such that
+            W 1 = 1 and both of the following two quantities are minimized over
+            all choice of laplacian-based communication matrices:
+                * The operator norm of W - (1 1^T / M)
+        """
+        if 0 == (M % 2):
+            r = 1 - (0.5 * (np.cos(2*np.pi/M) - 1))
+        else:
+            r = 1 - (0.5 * (np.cos(2*np.pi/M) + np.cos(np.pi*((M-1)/M))))
+        print(r)
+        return cls.get_lapl_based_comm_W(M, r=r, dtype=dtype, dev=dev)
+    @classmethod
+    def get_positive_optimal_lapl_based_comm_W(cls, M, dtype=None, dev=None):
+        """
+        Returns the optimal (with positive eigenvalues only) laplacian-based
+        communication matrix W
+
+        Parameters
+        ----------
+        M : int
+            The number of vertices
+
+        Returns
+        -------
+        W : tensor[2**hc_dim, 2**hc_dim]
+            The optimal (with positive eigenvalues only) laplacian-based
+            communication matrix W. W is such that W 1 = 1 and both of the
+            following two quantities are minimized over all choice of
+            laplacian-based communication matrices with strictly non-negative
+            eigenvalues:
+                * The operator norm of W - (1 1^T / M)
+                * The Frobenius norm of W - (1 1^T / M)
+        """
+        if 0 == (M % 2):
+            r = 2.
+        else:
+            r = 1 - np.cos(np.pi * ((M-1) / M))
+        return cls.get_lapl_based_comm_W(M, r=r, dtype=dtype, dev=dev)
 

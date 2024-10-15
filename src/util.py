@@ -132,6 +132,29 @@ def get_orthobasis(X, mode='qr-stable', others_X=None, return_S=False):
     else:
         return tuple(rv_arr)
 
+def grassmannian_extrinsic_dist(U1, U2, assume_ortho=False):
+    """
+    Computes the extrinsic Grassmannian distance between two orthobases
+
+    Parameters
+    ----------
+    U1 : tensor[..., N, K]
+    U2 : tensor[..., N, K]
+    assume_ortho : bool
+        If True, U1 and U2 are used to already be orthobases and
+        orthonormalization is skipped
+
+    Returns
+    -------
+    dist : tensor[...]
+    """
+    if not assume_ortho:
+        U1 = get_orthobasis(U1)
+        U2 = get_orthobasis(U2)
+    K = U1.shape[-1]
+    return K - ((U2.mT @ U1)**2).sum((-1,-2))
+
+
 def grassmannian_dist(U1, U2, assume_ortho=False):
     """
     Computes the Grassmannian geodesic distance between two orthobases
