@@ -13,10 +13,11 @@ from src.array_processing import generate_narrowband_weights_azel
 device = 'cpu'
 
 N = 128
+k = 1
 orth = lambda A: torch.linalg.qr(A)[0]
 
 # construct signal subspace
-az = torch.tensor(45)
+az = torch.tensor(0)
 el = torch.tensor(0)
 A = generate_narrowband_weights_azel(1, N, az, el).to(device)
 A /= torch.norm(A)
@@ -24,7 +25,7 @@ az = torch.tensor(-7)
 el = torch.tensor(0)
 A2 = generate_narrowband_weights_azel(1, N, az, el).to(device)
 A2 /= torch.norm(A)
-A = torch.cat([A, A2], dim=1); k = 2
+# A = torch.cat([A, A2], dim=1); k = 2
 
 def generate_sample(A, n, noise_level=3e-1):
     S = randn_complex(A.shape[1], n, device)
@@ -55,9 +56,9 @@ def plot_beam(weights, npts=1024):
 n_subspaces = 10
 Us = []
 for _ in range(n_subspaces):
-    X = generate_sample(A, 100)
+    X = generate_sample(A, 1000)
     U, _, __ = torch.linalg.svd(X)
-    U = U[:, :2]
+    U = U[:, :k]
     Us.append(U)
 
 # total projection spectrum
@@ -81,25 +82,28 @@ for i in range(n_nodes):
     node_data = X[:, i*node_samples:(i+1)*node_samples]
     node_R = node_data @ node_data.T.conj()
     U = torch.linalg.eigh(node_R)[1][:, -k:]
-    U = orth(torch.cat([U.real, U.imag], dim=1))
+    # U = orth(torch.cat([U.real, U.imag], dim=1))
+    U = U.real
     Us.append(U)
 Us = torch.stack(Us)
 
 # Create line graph connectivity
+max_iter = 30
 consensus = ChebyshevConsensus(
     CycleGraph.get_positive_optimal_lapl_based_comm_W(n_nodes),
-    cons_rounds = 8,
+    cons_rounds = max_iter,
 )
 
 # Run RGrAv
 kwargs = dict()
 alpha = 0.1
 rgrav = AsymptoticDRGrAv(alpha, consensus, **kwargs)
-U_rgrav = rgrav.average(Us)
+U_rgrav = rgrav.average(Us, max_iter=max_iter)
 for i in range(U_rgrav.shape[0]):
-    print('RGrAv dist', 4 - torch.norm(U_rgrav[0].T @ U_rgrav[i]) ** 2)
+    print('RGrAv dist', 2 * k - torch.norm(U_rgrav[0].T @ U_rgrav[i]) ** 2)
 U_rgrav = U_rgrav[0]
-U_rgrav = U_rgrav[:, :2] + 1j * U_rgrav[:, 2:]
+# U_rgrav = U_rgrav[:, :k] + 1j * U_rgrav[:, k:]
+U_rgrav = U_rgrav.to(torch.cfloat)
 
 R_rgrav = U_rgrav @ U_rgrav.T.conj()
 w_rgrav = torch.linalg.solve(R_rgrav, a)
@@ -108,12 +112,13 @@ w_rgrav = w_rgrav / torch.norm(w_rgrav)
 
 # Run DeEPCA
 deepca = DeEPCA(consensus) 
-U_deepca = deepca.average(Us)
-U_deepca = deepca.average(Us)
+U_deepca = deepca.average(Us, max_iter=max_iter)
 for i in range(U_deepca.shape[0]):
-    print('deepca dist', 4 - torch.norm(U_deepca[0].T @ U_deepca[i]) ** 2)
+    print('deepca dist', 2 * k - torch.norm(U_deepca[0].T @ U_deepca[i]) ** 2)
 U_deepca = U_deepca[0]
-U_deepca = U_deepca[:, :2] + 1j * U_deepca[:, 2:]
+# U_deepca = U_deepca[:, :k] + 1j * U_deepca[:, k:]
+U_deepca = U_deepca.to(torch.cfloat)
+
 R_deepca = U_deepca @ U_deepca.T.conj()
 w_deepca = torch.linalg.solve(R_deepca, a)
 w_deepca = w_deepca / (a.T.conj() @ w_deepca)
