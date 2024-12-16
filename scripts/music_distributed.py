@@ -13,6 +13,7 @@ from src.array_processing import generate_narrowband_weights_azel
 device = 'cpu'
 
 N = 128
+N = 32
 k = 1
 orth = lambda A: torch.linalg.qr(A)[0]
 
@@ -27,13 +28,21 @@ A2 = generate_narrowband_weights_azel(1, N, az, el).to(device)
 A2 /= torch.norm(A)
 A = torch.cat([A, A2], dim=1); k = 2
 
+k = 10
+azs = torch.rand(k) * 60 - 30
+As = []
+for az in azs:
+    As.append(generate_narrowband_weights_azel(1, N, az, el).to(device))
+A = torch.cat(As, dim=1)
+
 def generate_sample(A, n, noise_level=1e-1):
+    noise_level = 0.
     S = randn_complex(A.shape[1], n, device)
     E = randn_complex(N, n, device) * np.sqrt(noise_level)
     return A @ S + E
 
 # ideal MUSIC
-X = generate_sample(A, 10000)
+X = generate_sample(A, 1000)
 R = X @ X.T.conj()
 
 U_est, _, _ = torch.linalg.svd(R)
@@ -74,7 +83,7 @@ for U in Us:
 _, P_S, _ = torch.linalg.svd(P)
 
 # do consensus with DRGrAv
-max_iter = 10
+max_iter = 30
 consensus = ChebyshevConsensus(
     CycleGraph.get_positive_optimal_lapl_based_comm_W(n_nodes),
     cons_rounds = max_iter,
@@ -86,21 +95,24 @@ alpha = 0.1
 rgrav = AsymptoticDRGrAv(alpha, consensus, **kwargs)
 U_rgrav = rgrav.average(Us, max_iter=max_iter)
 for i in range(U_rgrav.shape[0]):
-    print('RGrAv dist', (N - k) - torch.norm(U_rgrav[0].T @ U_rgrav[i]) ** 2)
+    print('RGrAv dist', (N - k) - torch.norm(U_rgrav[0].T.conj() @ U_rgrav[i]) ** 2)
+for i in range(U_rgrav.shape[0]):
+    print('RGrAv dist data', (N - k) - torch.norm(Us[0].T.conj() @ U_rgrav[i]) ** 2)
 U_rgrav = U_rgrav[0]
 # U_rgrav = U_rgrav[:, :k] + 1j * U_rgrav[:, k:]
 U_rgrav = U_rgrav.to(torch.cfloat)
 
 azs, spec = music_spec(U_rgrav)
+plt.figure()
 plt.plot(azs, spec, label='DRGrAv')
 
 # run DEEPCA
-# deepca = DeEPCA(consensus) 
-# U_deepca = deepca.average(Us, max_iter=max_iter)
-# U_deepca = U_deepca[0]
+deepca = DeEPCA(consensus) 
+U_deepca = deepca.average(Us, max_iter=max_iter)
+U_deepca = U_deepca[0]
 
-# azs, spec = music_spec(U_deepca)
-# plt.plot(azs, spec, label='DEEPCA')
+azs, spec = music_spec(U_deepca)
+plt.plot(azs, spec, label='DEEPCA')
 
 plt.legend()
 
