@@ -87,7 +87,8 @@ def get_orthobasis(X, mode='qr-stable', others_X=None, return_S=False):
                     f'util.get_orthobasis: {mode=} applied on a degenerate'
                     ' matrix'
                 )
-            sd_R = sd_R.sign()
+            # sd_R = sd_R.sign()
+            sd_R = torch.sgn(sd_R)
             U = Q * sd_R[..., None, :]
             if others_X or return_S:
                 R *= sd_R[..., :, None]

@@ -117,6 +117,8 @@ class ChebyshevConsensus(ConsensusMethod):
         X_ = X.reshape(shape_X[0], -1)
         for it in range(1, self.cons_rounds+1):
             if 1 == it:
+                if self.comm_W.dtype != X_.dtype:
+                    self.comm_W = self.comm_W.to(X_.dtype)
                 next_X_ = self.comm_W @ X_
             else:
                 a = self.cmn.a(it)
