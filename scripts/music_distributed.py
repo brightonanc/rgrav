@@ -36,7 +36,6 @@ for az in azs:
 A = torch.cat(As, dim=1)
 
 def generate_sample(A, n, noise_level=1e-1):
-    noise_level = 0.
     S = randn_complex(A.shape[1], n, device)
     E = randn_complex(N, n, device) * np.sqrt(noise_level)
     return A @ S + E
@@ -84,6 +83,7 @@ _, P_S, _ = torch.linalg.svd(P)
 
 # do consensus with DRGrAv
 max_iter = 30
+max_iter = 5
 consensus = ChebyshevConsensus(
     CycleGraph.get_positive_optimal_lapl_based_comm_W(n_nodes),
     cons_rounds = max_iter,
@@ -109,6 +109,10 @@ plt.plot(azs, spec, label='DRGrAv')
 # run DEEPCA
 deepca = DeEPCA(consensus) 
 U_deepca = deepca.average(Us, max_iter=max_iter)
+for i in range(U_deepca.shape[0]):
+    print('DEEPCA dist', (N - k) - torch.norm(U_deepca[0].T.conj() @ U_deepca[i]) ** 2)
+for i in range(U_deepca.shape[0]):
+    print('DEEPCA dist data', (N - k) - torch.norm(Us[0].T.conj() @ U_deepca[i]) ** 2)
 U_deepca = U_deepca[0]
 
 azs, spec = music_spec(U_deepca)
