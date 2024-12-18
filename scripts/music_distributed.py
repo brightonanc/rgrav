@@ -17,6 +17,11 @@ def randn_complex(a, b, device=device):
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = 'cpu'
 
+seed = 101
+if seed:
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
 N = 128
 N = 32
 k = 1
@@ -33,10 +38,10 @@ A2 = generate_narrowband_weights_azel(1, N, az, el).to(device)
 A2 /= torch.norm(A)
 A = torch.cat([A, A2], dim=1); k = 2
 
-k = 10
-azs = torch.rand(k) * 60 - 30
+k = 5
+emitter_azs = torch.rand(k) * 60 - 30
 As = []
-for az in azs:
+for az in emitter_azs:
     As.append(generate_narrowband_weights_azel(1, N, az, el).to(device))
 A = torch.cat(As, dim=1)
 A = torch.linalg.qr(A).Q
@@ -93,7 +98,7 @@ _, P_S, _ = torch.linalg.svd(P)
 
 # do consensus with DRGrAv
 max_iter = 30
-max_iter = 5
+# max_iter = 5
 consensus = ChebyshevConsensus(
     CycleGraph.get_positive_optimal_lapl_based_comm_W(n_nodes),
     cons_rounds = max_iter,
@@ -129,6 +134,8 @@ azs, spec = music_spec(U_deepca)
 plt.plot(azs, spec, label='DEEPCA')
 
 plt.legend()
+for az in emitter_azs:
+    plt.axvline(az, c='k', alpha=0.7, linestyle='-')
 
 plt.figure()
 plt.suptitle('Projector Spectrum')
