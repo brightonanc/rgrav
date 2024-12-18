@@ -49,7 +49,7 @@ U_true = torch.randn(N, N-k, dtype=torch.cfloat)
 U_true = U_true - A @ (A.T.conj() @ U_true)
 U_true = torch.linalg.qr(U_true)[0]
 
-def generate_sample(A, n, noise_level=1e-3):
+def generate_sample(A, n, noise_level=1e-1):
     S = randn_complex(A.shape[1], n, device)
     E = randn_complex(N, n, device) * np.sqrt(noise_level)
     return A @ S + E
@@ -148,11 +148,13 @@ plt.figure()
 plt.suptitle('Projector Spectrum')
 plt.plot(P_S)
 
-U_rgravs = []
+U_rgravs = [Us[0]]
 max_iters = range(5, 35, 5)
-# max_iters = range(10, 110, 20)
-# max_iters = range(1, 6)
+max_iters = range(10, 110, 20)
+# max_iters = range(0, 6)
 for max_iter in max_iters:
+    if max_iter == 0:
+        continue
     consensus = ChebyshevConsensus(
         CycleGraph.get_positive_optimal_lapl_based_comm_W(n_nodes),
         cons_rounds = max_iter,
@@ -168,8 +170,10 @@ for i in range(len(max_iters)):
     plt.plot(azs, spec, label=f'DRGrAv i={max_iters[i]}')
 plt.legend()
 
-U_deepcas = []
+U_deepcas = [Us[0]]
 for max_iter in max_iters:
+    if max_iter == 0:
+        continue
     consensus = ChebyshevConsensus(
         CycleGraph.get_positive_optimal_lapl_based_comm_W(n_nodes),
         cons_rounds = max_iter,
@@ -179,10 +183,26 @@ for max_iter in max_iters:
     U_deepca = U_deepca[0]
     U_deepcas.append(U_deepca)
 
+
 plt.figure()
 for i in range(len(max_iters)):
     azs, spec = music_spec(U_deepcas[i])
     plt.plot(azs, spec, label=f'DEEPCA i={max_iters[i]}')
+plt.legend()
+
+from src.frechet_mean_by_gd import FrechetMeanByGradientDescent
+frechet = FrechetMeanByGradientDescent()
+U_frechets = []
+for t, iter_frame in enumerate(frechet.algo_iters(Us)):
+    if t in max_iters:
+        U_frechets.append(iter_frame.U.clone())
+    if t > max(max_iters):
+        break
+
+plt.figure()
+for i in range(len(max_iters)):
+    azs, spec = music_spec(U_frechets[i])
+    plt.plot(azs, spec, label=f'Frechet i={max_iters[i]}')
 plt.legend()
 
 def subspace_dist(U, V):
@@ -197,6 +217,9 @@ for U_rgrav in U_rgravs:
 sub_errs['DEEPCA'] = []
 for U_deepca in U_deepcas:
     sub_errs['DEEPCA'].append(subspace_dist(U_true, U_deepca))
+sub_errs['frechet'] = []
+for U_frechet in U_frechets:
+    sub_errs['frechet'].append(subspace_dist(U_true, U_frechet))
 
 plt.figure()
 for k, v in sub_errs.items():
