@@ -4,10 +4,15 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from subspace.algorithms import randn_complex
-
 from src import AsymptoticDRGrAv, DeEPCA, ChebyshevConsensus, CycleGraph
 from src.array_processing import generate_narrowband_weights_azel
+
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+def randn_complex(a, b, device=device):
+    ret = torch.randn(a, b, dtype=torch.cfloat, device=device) \
+        + 1j * torch.randn(a, b, dtype=torch.cfloat, device=device)
+    return ret
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = 'cpu'
