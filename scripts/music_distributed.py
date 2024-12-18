@@ -150,7 +150,7 @@ plt.plot(P_S)
 
 U_rgravs = [Us[0]]
 max_iters = range(5, 35, 5)
-max_iters = range(10, 110, 20)
+max_iters = range(0, 110, 20)
 # max_iters = range(0, 6)
 for max_iter in max_iters:
     if max_iter == 0:
@@ -195,7 +195,11 @@ frechet = FrechetMeanByGradientDescent()
 U_frechets = []
 for t, iter_frame in enumerate(frechet.algo_iters(Us)):
     if t in max_iters:
-        U_frechets.append(iter_frame.U.clone())
+        U_frechet = iter_frame.U.clone()
+        # plt.figure()
+        # plt.imshow((U_frechet.T.conj() @ U_frechet).abs())
+        # plt.show()
+        U_frechets.append(U_frechet)
     if t > max(max_iters):
         break
 
@@ -206,8 +210,10 @@ for i in range(len(max_iters)):
 plt.legend()
 
 def subspace_dist(U, V):
-    # assert U.shape == V.shape, f'{U.shape}, {V.shape}'
+    assert U.shape == V.shape, f'{U.shape}, {V.shape}'
     assert U.shape[1] == N - k
+    # assert torch.norm(U.T.conj() @ U - torch.eye(N-k)) < 1e-5
+    # assert torch.norm(V.T.conj() @ V - torch.eye(N-k)) < 1e-5
     return (N - k) - torch.norm(U.T.conj() @ V) ** 2
 
 sub_errs = dict()
