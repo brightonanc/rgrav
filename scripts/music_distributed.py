@@ -49,7 +49,7 @@ U_true = torch.randn(N, N-k, dtype=torch.cfloat)
 U_true = U_true - A @ (A.T.conj() @ U_true)
 U_true = torch.linalg.qr(U_true)[0]
 
-def generate_sample(A, n, noise_level=1e-1):
+def generate_sample(A, n, noise_level=1e-3):
     S = randn_complex(A.shape[1], n, device)
     E = randn_complex(N, n, device) * np.sqrt(noise_level)
     return A @ S + E
@@ -75,10 +75,12 @@ azs, spec = music_spec(U_est)
 
 plt.figure()
 plt.plot(azs, spec, label='Centralized')
+plt.xlabel('Angle (degrees)')
+plt.ylabel('MUSIC Spectrum')
 
 # Split data into 10 nodes
 # each node contains noise subspace for local data
-n_nodes = 10
+n_nodes = 20
 node_samples = X.shape[1] // n_nodes
 Us = []
 for i in range(n_nodes):
@@ -98,6 +100,7 @@ _, P_S, _ = torch.linalg.svd(P)
 
 # do consensus with DRGrAv
 max_iter = 30
+max_iter = 100
 # max_iter = 5
 consensus = ChebyshevConsensus(
     CycleGraph.get_positive_optimal_lapl_based_comm_W(n_nodes),
@@ -131,11 +134,15 @@ for i in range(U_deepca.shape[0]):
 U_deepca = U_deepca[0]
 
 azs, spec = music_spec(U_deepca)
-plt.plot(azs, spec, label='DEEPCA')
+# plt.plot(azs, spec, label='DEEPCA')
 
 plt.legend()
 for az in emitter_azs:
-    plt.axvline(az, c='k', alpha=0.7, linestyle='-')
+    plt.axvline(az, c='k', alpha=0.7, linestyle='-', label='Sources')
+    if az == emitter_azs[0]:
+        plt.legend()
+plt.xlabel('Angle (degrees)')
+plt.ylabel('MUSIC Spectrum')
 
 plt.figure()
 plt.suptitle('Projector Spectrum')
@@ -179,7 +186,7 @@ for i in range(len(max_iters)):
 plt.legend()
 
 def subspace_dist(U, V):
-    assert U.shape == V.shape, f'{U.shape}, {V.shape}'
+    # assert U.shape == V.shape, f'{U.shape}, {V.shape}'
     assert U.shape[1] == N - k
     return (N - k) - torch.norm(U.T.conj() @ V) ** 2
 
