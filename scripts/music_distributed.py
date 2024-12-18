@@ -39,6 +39,10 @@ As = []
 for az in azs:
     As.append(generate_narrowband_weights_azel(1, N, az, el).to(device))
 A = torch.cat(As, dim=1)
+A = torch.linalg.qr(A).Q
+U_true = torch.randn(N, N-k, dtype=torch.cfloat)
+U_true = U_true - A @ (A.T.conj() @ U_true)
+U_true = torch.linalg.qr(U_true)[0]
 
 def generate_sample(A, n, noise_level=1e-1):
     S = randn_complex(A.shape[1], n, device)
@@ -84,6 +88,7 @@ Us = torch.stack(Us)
 P = 0.
 for U in Us:
     P += U @ U.T.conj()
+P /= n_nodes
 _, P_S, _ = torch.linalg.svd(P)
 
 # do consensus with DRGrAv
@@ -128,5 +133,60 @@ plt.legend()
 plt.figure()
 plt.suptitle('Projector Spectrum')
 plt.plot(P_S)
+
+U_rgravs = []
+max_iters = range(5, 35, 5)
+# max_iters = range(10, 110, 20)
+# max_iters = range(1, 6)
+for max_iter in max_iters:
+    consensus = ChebyshevConsensus(
+        CycleGraph.get_positive_optimal_lapl_based_comm_W(n_nodes),
+        cons_rounds = max_iter,
+    )
+    rgrav = AsymptoticDRGrAv(alpha, consensus, **kwargs)
+    U_rgrav = rgrav.average(Us, max_iter=max_iter)
+    U_rgrav = U_rgrav[0]
+    U_rgravs.append(U_rgrav)
+
+plt.figure()
+for i in range(len(max_iters)):
+    azs, spec = music_spec(U_rgravs[i])
+    plt.plot(azs, spec, label=f'DRGrAv i={max_iters[i]}')
+plt.legend()
+
+U_deepcas = []
+for max_iter in max_iters:
+    consensus = ChebyshevConsensus(
+        CycleGraph.get_positive_optimal_lapl_based_comm_W(n_nodes),
+        cons_rounds = max_iter,
+    )
+    deepca = DeEPCA(consensus)
+    U_deepca = deepca.average(Us, max_iter=max_iter)
+    U_deepca = U_deepca[0]
+    U_deepcas.append(U_deepca)
+
+plt.figure()
+for i in range(len(max_iters)):
+    azs, spec = music_spec(U_deepcas[i])
+    plt.plot(azs, spec, label=f'DEEPCA i={max_iters[i]}')
+plt.legend()
+
+def subspace_dist(U, V):
+    assert U.shape == V.shape, f'{U.shape}, {V.shape}'
+    assert U.shape[1] == N - k
+    return (N - k) - torch.norm(U.T.conj() @ V) ** 2
+
+sub_errs = dict()
+sub_errs['DRGrAv'] = []
+for U_rgrav in U_rgravs:
+    sub_errs['DRGrAv'].append(subspace_dist(U_true, U_rgrav))
+sub_errs['DEEPCA'] = []
+for U_deepca in U_deepcas:
+    sub_errs['DEEPCA'].append(subspace_dist(U_true, U_deepca))
+
+plt.figure()
+for k, v in sub_errs.items():
+    plt.plot(max_iters, v, label=k)
+plt.legend()
 
 plt.show()
