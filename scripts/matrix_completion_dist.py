@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+from src import *
+
 
 U_correct = None
 V_correct = None
@@ -25,12 +27,12 @@ def mask_matrix(X, mask_ratio=0.5):
 def nuclear_norm(X):
     return torch.sum(torch.svd(X)[1])
 
-def compute_V(U, M, mask):
+def compute_V(U, X, mask):
     m, r = U.shape
-    m2, n = M.shape
+    m2, n = X.shape
     
     assert m == m2, "U and M must have the same number of rows"
-    assert mask.shape == M.shape, "Mask must have the same shape as M"
+    assert mask.shape == X.shape, "Mask must have the same shape as M"
     
     V = torch.zeros((r, n))
     
@@ -42,17 +44,17 @@ def compute_V(U, M, mask):
         
         # Extract observed rows of U and M
         U_obs = U[observed, :]
-        M_obs = M[observed, j]
+        X_obs = X[observed, j]
         
         UTU = U_obs.T @ U_obs
         
-        UTM = U_obs.T @ M_obs
-        V[:, j] = torch.linalg.lstsq(UTU, UTM, rcond=None)[0]
+        UTX = U_obs.T @ X_obs
+        V[:, j] = torch.linalg.lstsq(UTU, UTX, rcond=None)[0]
     
     return V.T
 
-def update_U_with_gradient_step(U, V, M, mask, step_size=0.1):
-    residual = mask * (M - U @ V.T)
+def update_U_with_gradient_step(U, V, X, mask, step_size=0.1):
+    residual = mask * (X - U @ V.T)
     euclidean_grad = -2 * residual @ V
     
     # Project onto the tangent space
@@ -67,8 +69,8 @@ def update_U_with_gradient_step(U, V, M, mask, step_size=0.1):
     
     return U_new
 
-def procrustes_U(U, V, M, mask):
-    B = M @ (V @ torch.linalg.pinv(V.T @ V))
+def procrustes_U(U, V, X, mask):
+    B = X @ (V @ torch.linalg.pinv(V.T @ V))
     W, _, Z = torch.linalg.svd(B, full_matrices=False)
     return W @ Z.T
 
@@ -96,8 +98,6 @@ def matrix_completion(X_masked, mask, rank, num_iterations=1000):
     return X_recovered, losses, U_losses
 
 def evaluate_recovery(X_true, X_recovered, mask):
-    """Evaluate the recovery quality.
-    Computes MSE and relative error on specified entries (usually unobserved ones)."""
     mse = torch.mean((X_true[~mask] - X_recovered[~mask])**2)
     rel_error = torch.norm(X_true[~mask] - X_recovered[~mask]) / torch.norm(X_true[~mask])
     return mse, rel_error
@@ -107,19 +107,66 @@ def main():
     torch.manual_seed(42)
     
     # Generate synthetic data
-    m, n = 100, 100
+    m, n = 100, 1000
     rank = 5
     X_true = generate_low_rank_matrix(m, n, rank)
-    
+
     # Create masked version
     mask_ratio = 0.80
     X_masked, mask = mask_matrix(X_true, mask_ratio)
     
+    # distribute the load
+    n_workers = 10
+    k = n // n_workers
+    U_arr = []
+    V_arr = []
+    X_arr = []
+    mask_arr = []
+    for i in range(n_workers):
+        _U = torch.linalg.qr(torch.randn(m, rank)).Q
+        _V = torch.randn(k, rank)
+        _X = X_true[:, i*k:(i+1)*k]
+        _mask = mask[:, i*k:(i+1)*k]
+        U_arr.append(_U)
+        V_arr.append(_V)
+        X_arr.append(_X)
+        mask_arr.append(_mask)
+    U_arr = torch.stack(U_arr, dim=0)
+    V_arr = torch.stack(V_arr, dim=0)
+    X_arr = torch.stack(X_arr, dim=0)
+    mask_arr = torch.stack(mask_arr, dim=0)
+
+    # move everything to GPU
+    # global U_correct
+    # U_correct = U_correct.to('cuda')
+    # U_arr = U_arr.to('cuda')
+    # V_arr = V_arr.to('cuda')
+    # X_arr = X_arr.to('cuda')
+    # mask_arr = mask_arr.to('cuda')
+    
     # Perform matrix completion
-    num_iterations = 1000
+    num_iterations = 10000
+    # X_recovered, losses, U_losses = matrix_completion(X_masked, mask, rank, num_iterations)
     
-    X_recovered, losses, U_losses = matrix_completion(X_masked, mask, rank, num_iterations)
-    
+    ave_algo = AsymptoticRGrAv(0.05)
+
+    lr = 1e-1
+    # distribute matrix completion across workers
+    losses, U_losses = [], []
+    for t in tqdm(range(num_iterations)):
+        for i in range(n_workers):
+            V_arr[i] = compute_V(U_arr[i], X_arr[i], mask_arr[i])
+            U_arr[i] = update_U_with_gradient_step(U_arr[i], V_arr[i], X_arr[i], mask_arr[i], lr)
+        
+        # do consensus on Us
+        ave_algo.average(U_arr, max_iter=1)
+
+        loss = sum(torch.linalg.norm(_mask * (_X - _U @ _V.T)) 
+                   for _U, _V, _X, _mask in zip(U_arr, V_arr, X_arr, mask_arr))
+        U_loss = sum(rank - torch.linalg.norm(_U.T @ U_correct) ** 2 for _U in U_arr)
+        losses.append(loss / n_workers)
+        U_losses.append(U_loss / n_workers)
+
     plt.figure()
     plt.imshow(mask)
     plt.figure()
@@ -127,7 +174,24 @@ def main():
     plt.plot(losses)
     plt.subplot(122)
     plt.plot(U_losses)
+
+    pairwise_dists = torch.zeros((n_workers, n_workers))
+    for i in range(n_workers):
+        for j in range(n_workers):
+            U1 = U_arr[i]
+            U2 = U_arr[j]
+            dist = rank - torch.linalg.norm(U1.T @ U2) ** 2
+            pairwise_dists[i, j] = dist
     
+    plt.figure()
+    plt.imshow(pairwise_dists)
+
+    X_recovered = []
+    for i in range(n_workers):
+        _Xr = U_arr[i] @ V_arr[i].T
+        X_recovered.append(_Xr)
+    X_recovered = torch.cat(X_recovered, dim=1)
+
     # Evaluate results on unobserved entries
     mse, rel_error = evaluate_recovery(X_true, X_recovered, mask)
     print(f"MSE on unobserved entries: {mse:.6f}")
