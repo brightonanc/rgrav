@@ -47,6 +47,12 @@ def compute_V(U, X, mask):
         X_obs = X[observed, j]
         
         UTU = U_obs.T @ U_obs
+        # print(torch.linalg.norm(UTU))
+        # UTU += torch.eye(UTU.shape[0]) * (1e-1 * torch.linalg.norm(UTU))
+        # regularization of 1e-2 seems best
+        UTU += torch.eye(UTU.shape[0]) * 1e-1
+        # print(torch.linalg.norm(UTU))
+        # input()
         
         UTX = U_obs.T @ X_obs
         V[:, j] = torch.linalg.lstsq(UTU, UTX, rcond=None)[0]
@@ -108,7 +114,7 @@ def main():
     
     # Generate synthetic data
     m, n = 100, 1000
-    rank = 5
+    rank = 2
     X_true = generate_low_rank_matrix(m, n, rank)
 
     # Create masked version
@@ -159,7 +165,7 @@ def main():
             U_arr[i] = update_U_with_gradient_step(U_arr[i], V_arr[i], X_arr[i], mask_arr[i], lr)
         
         # do consensus on Us
-        ave_algo.average(U_arr, max_iter=1)
+        ave_algo.average(U_arr, max_iter=10)
 
         loss = sum(torch.linalg.norm(_mask * (_X - _U @ _V.T)) 
                    for _U, _V, _X, _mask in zip(U_arr, V_arr, X_arr, mask_arr))
@@ -174,6 +180,17 @@ def main():
     plt.plot(losses)
     plt.subplot(122)
     plt.plot(U_losses)
+
+    # measure each distance to correct
+    correct_dists = torch.zeros(n_workers)
+    for i in range(n_workers):
+        U1 = U_arr[i]
+        dist = rank - torch.linalg.norm(U1.T @ U_correct) ** 2
+        correct_dists[i] = dist
+
+    plt.figure()
+    plt.suptitle('Distance to True Subspace')
+    plt.bar(torch.arange(n_workers), correct_dists)
 
     pairwise_dists = torch.zeros((n_workers, n_workers))
     for i in range(n_workers):
@@ -205,20 +222,25 @@ def main():
     # Visualize results
     plt.figure(figsize=(15, 5))
     
-    plt.subplot(131)
-    plt.imshow(X_true.cpu(), cmap='viridis')
+    plt.subplot(221)
+    plt.imshow(X_true.cpu(), cmap='viridis', aspect='auto')
     plt.colorbar()
     plt.title('True Matrix')
     
-    plt.subplot(132)
-    plt.imshow(X_masked.cpu(), cmap='viridis')
+    plt.subplot(222)
+    plt.imshow(X_masked.cpu(), cmap='viridis', aspect='auto')
     plt.colorbar()
     plt.title('Masked Matrix')
     
-    plt.subplot(133)
-    plt.imshow(X_recovered.cpu(), cmap='viridis')
+    plt.subplot(223)
+    plt.imshow(X_recovered.cpu(), cmap='viridis', aspect='auto')
     plt.colorbar()
     plt.title('Recovered Matrix')
+    
+    plt.subplot(224)
+    plt.imshow((X_recovered-X_true).abs().cpu(), cmap='viridis', aspect='auto')
+    plt.colorbar()
+    plt.title('Error')
     
     plt.tight_layout()
     
